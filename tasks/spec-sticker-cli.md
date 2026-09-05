@@ -189,7 +189,7 @@ message/hint 为面向人的文字，不是分支依据；type/subtype/退出码
 
 ### 4.3 搜索与分页
 
-按 caption 做 Unicode 小写后子串匹配，不做分词或语义推断。来源集合：先按 --pack 筛选，再与 --favorites 取交集；不存在的 --pack 报错。同一 MD5 不同 SHA-256 视作冲突，不任选一项。
+按 caption 做 Unicode 小写后子串匹配，不做分词或情绪分类推断。用户可以用宽泛的场景词获取一组可选结果；CLI 不承诺某个词只对应一种情绪，也不要求唯一语义命中。来源集合：先按 --pack 筛选，再与 --favorites 取交集；不存在的 --pack 报错。同一 MD5 不同 SHA-256 视作冲突，不任选一项。
 
 重复项 caption 优先级：存在个人记录时使用个人 caption（包括显式空值）；否则按 pack ID 字典序选择首个非空 caption。查询结果按 MD5 升序。offset ≥ total 返回空列表；limit 1–100，默认 10；offset ≥ 0。
 

@@ -25,13 +25,14 @@
 | --- | --- |
 | 原图 | 2,638 张，1,078,506,374 字节，约 1.00 GiB |
 | GIF | 1,850 张 |
+| WebP | 15 张（仅在全量包，精选包不含） |
 | 清单 | 根目录 `manifest.json`，`schema_version: 1` |
 | 图片路径 | `emoticons/<md5>.<format>` |
 | 清单字段 | `md5`、`sha256`、`filename`、`format`、`size`、`caption` |
 | 已有具体描述 | 2,638 张，当前素材主干已完成描述更新 |
 | 精选候选 | 画面复核后保留 120 张，21,703,567 字节，约 20.7 MiB |
 
-精选候选来自描述筛选并已完成逐张画面复核，最终数量仍从清单读取，不在 CLI 中硬编码。全量描述更新后，检索验收应覆盖中文 caption、同义表达和空结果边界。
+精选候选来自描述筛选并已完成逐张画面复核，最终数量仍从清单读取，不在 CLI 中硬编码。精选内容刻意覆盖等待、回应、工作、犯困、庆祝等多种调皮场景；检索依赖描述文本，不要求把每张图判定成唯一情绪。全量描述更新后，检索验收应覆盖中文 caption、同义表达、宽泛场景词和空结果边界。
 
 ## 2. 目标
 
@@ -107,6 +108,7 @@ CLI 首次使用默认官方素材源，同时支持显式指定本地包目录�
 
 **验收标准：**
 - [ ] `search '收到' --limit 5` 在已安装包和私人收藏中按描述进行子串检索，英文大小写不敏感。
+- [ ] 使用宽泛场景词（例如“等待”“工作”）时，fixture 中有多个匹配项即可返回一组候选；系统不要求情绪分类器或唯一的语义命中。
 - [ ] 可按包、仅收藏筛选；过滤先于分页。
 - [ ] 返回稳定排序、条目 ID、描述、格式、大小、来源及绝对路径；结果有明确分页续查字段。
 - [ ] 相同内容跨包去重；私人描述优先于公共包描述。
@@ -185,6 +187,7 @@ CLI 首次使用默认官方素材源，同时支持显式指定本地包目录�
 - [ ] 精选与全量引用相同原图文件，不复制一套精选图片。
 - [ ] 检查目录条目数、字节数、路径、成员关系及哈希一致；精选必须是全量的子集。
 - [ ] 精选发布前复核候选画面与描述；新增素材与对应清单成套提交。
+- [ ] 精选清单覆盖多种可调皮使用的场景，描述与画面相符即可，不以单一情绪标签作为收录门槛。
 - [ ] 仓库改名后，文档、CLI 默认源及安装示例均指向新名；既有清单导入不受影响。
 
 ### US-013：提供跨 Agent 使用指引
@@ -269,6 +272,8 @@ sticker packs list
 sticker packs install curated --dry-run
 sticker packs install curated
 sticker packs install all
+sticker setup --pack curated
+sticker packs install curated --source /path/to/sticker-ext
 sticker packs update curated
 sticker packs remove curated --dry-run
 sticker search '收到' --limit 5
@@ -283,6 +288,7 @@ sticker favorites list --collection work --sort manual
 sticker favorites describe <id> --caption '新的描述'
 sticker favorites remove <id> --dry-run
 sticker favorites import /path/to/v1-pack
+sticker favorites import /path/to/sticker-ext
 sticker favorites export /path/to/new-export
 ```
 

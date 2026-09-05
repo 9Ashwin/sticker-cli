@@ -1,6 +1,6 @@
 # 实施 Issues：sticker-cli
 
-状态：I01…I21 已创建为 GitHub Issues（19 项在 CLI 仓库、2 项在素材仓库）；编号用于保持设计与实际 Issue 的映射。
+状态：I01…I22 已创建为 GitHub Issues（20 项在 CLI 仓库、2 项在素材仓库）；编号用于保持设计与实际 Issue 的映射。
 
 来源：[PRD](prd-sticker-cli.md)、[SPEC](spec-sticker-cli.md)。P1 为首个可用闭环，P2 为后续生命周期功能。
 
@@ -25,7 +25,7 @@
 | [I17](https://github.com/9Ashwin/sticker-cli/issues/15) | Go 二进制分发与平台验收 | P1 | I05、I08、I10、I12 | sticker-cli |
 | [I18](https://github.com/9Ashwin/sticker-cli/issues/16) | Agent Skill 与端到端使用验收 | P1 | I03、I05、I08、I10、I12、I17、I19、I20、I22 | sticker-cli |
 | [I19](https://github.com/9Ashwin/sticker-cli/issues/18) | 收藏分类与自定义分组 | P1 | I02、I03、I11、I12 | sticker-cli |
-| [I20](https://github.com/9Ashwin/sticker-cli/issues/19) | 收藏排序与批量整理 | P1 | I19 | sticker-cli |
+| [I20](https://github.com/9Ashwin/sticker-cli/issues/19) | 收藏排序与批量整理 | P1 | I13、I14、I19 | sticker-cli |
 | [I21](https://github.com/9Ashwin/sticker-cli/issues/20) | 收藏整理端到端自动化验证 | P1 | I01–I20 | sticker-cli |
 | [I22](https://github.com/9Ashwin/sticker-cli/issues/21) | 一键初始化精选或全量素材 | P1 | I03、I06、I08 | sticker-cli |
 
@@ -177,6 +177,7 @@ GitHub：[9Ashwin/sticker-cli#7](https://github.com/9Ashwin/sticker-cli/issues/7
 
 - [ ] 合并个人清单与包清单，按内容去重，执行指定 caption 优先级。
 - [ ] 支持 --pack/--favorites 交集、大小写不敏感子串查询及 MD5 稳定排序。
+- [ ] 对 fixture 中覆盖多个条目的宽泛场景词返回一组候选；验收不依赖情绪分类器或唯一语义命中。
 - [ ] 提供 limit/offset/next_offset/has_more，空结果成功，超限输出仍可续查。
 - [ ] 验证离线零网络及 2,638 条基线性能，报告测量值而非预设达标。
 
@@ -357,14 +358,14 @@ GitHub：[9Ashwin/sticker-cli#19](https://github.com/9Ashwin/sticker-cli/issues/
 
 范围：US-015。阶段：P1。类型：backend。优先级：high。
 
-依赖：I19。SPEC：§3.6、4.1、5.4–5.5。验证组：T17。
+依赖：I13、I14、I19。SPEC：§3.6、4.1、5.4–5.5。验证组：T17。
 
 验收：
 
 - [ ] `favorites list` 支持分组筛选与 `manual`、`added`、`caption`、`md5` 四种稳定排序。
 - [ ] 非交互命令支持按 ID 批量移动、重排和取消收藏，`--dry-run` 不写入。
 - [ ] 无效 ID、重复顺序或并发版本变化整体失败，已有收藏和顺序保持不变。
-- [ ] 分组与顺序元数据保持可供后续导出扩展的结构；旧客户端仍可读取 v1 清单和原图。
+- [ ] 导出包含可选分组/顺序扩展；旧客户端仍可读取 v1 清单和原图。
 
 Demo path：在两个分组各放入两个 fixture，分别执行手动重排、caption 排序和批量移动，断言 JSON 顺序与 dry-run 前后一致。
 
