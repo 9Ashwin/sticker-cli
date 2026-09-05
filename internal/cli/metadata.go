@@ -411,7 +411,7 @@ func favoriteExportMetadata() commandMetadata {
 		Effect:      effectWrite,
 		Parameters:  []parameterMetadata{{Name: "dir", Type: "string", Source: "argument", Description: "New export directory", Required: true}},
 		Flags:       []flagMetadata{{Name: "dry-run", Type: "bool", Default: false, Description: "Show the export plan without writing"}},
-		Result:      objectSchema("path", "string", "count", "int", "size", "int"),
+		Result:      objectSchema("path", "string", "count", "int", "size", "int", "dry_run", "bool"),
 		Errors:      defaultErrors(),
 		Examples:    []string{"sticker favorites export ./shared-pack", "sticker favorites export ./shared-pack --dry-run"},
 		Args:        cobra.ExactArgs(1),
