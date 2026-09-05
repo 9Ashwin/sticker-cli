@@ -9,4 +9,6 @@
 - **可选素材：** 当前全量 2,638 张，约 1 GiB；精选候选 124 张，约 21.8 MiB，发布前需复核。
 - **收藏导入：** 本地原图和清单按现有 `manifest.json` + `emoticons/` 格式合并到个人素材库，不另设收藏格式；公共包更新不会覆盖个人素材。
 
-请阅读 [PRD 草案](tasks/prd-emoticon-cli.md)。需求确认后先完成技术设计和任务拆解，再开始实现。PRD 中的命令均为设计示例，尚不可执行。
+[PRD](tasks/prd-emoticon-cli.md) 已确认，现有 [技术 SPEC 草案](tasks/spec-emoticon-cli.md) 和 [18 项实施任务草案](tasks/issues-emoticon-cli.md) 待评审。首版使用现有 JSON 清单，SQLite 可重建索引作为有明确需求后的选项，JSONL 不作为素材库格式。
+
+目前没有创建实施 Issues，也没有发布实现。文档中的命令均为设计示例，尚不可执行。
