@@ -42,16 +42,17 @@ type Result struct {
 // Item is the metadata returned for a searchable image. Search deliberately
 // does not read image bytes; get performs the complete integrity check.
 type Item struct {
-	ID       string   `json:"id"`
-	MD5      string   `json:"md5"`
-	SHA256   string   `json:"sha256"`
-	Filename string   `json:"filename"`
-	Format   string   `json:"format"`
-	Size     int64    `json:"size"`
-	Caption  string   `json:"caption"`
-	Path     string   `json:"path"`
-	Favorite bool     `json:"favorite"`
-	Packs    []string `json:"packs"`
+	ID          string   `json:"id"`
+	MD5         string   `json:"md5"`
+	SHA256      string   `json:"sha256"`
+	Filename    string   `json:"filename"`
+	Format      string   `json:"format"`
+	Size        int64    `json:"size"`
+	Caption     string   `json:"caption"`
+	Path        string   `json:"path"`
+	Favorite    bool     `json:"favorite"`
+	Packs       []string `json:"packs"`
+	PreviewPath string   `json:"preview_path,omitempty"`
 }
 
 type packState struct {

@@ -188,7 +188,7 @@ func registerCommands(root *cobra.Command, registry *commandRegistry, options *r
 		if err := validateMD5ID(args[0], "ID"); err != nil {
 			return err
 		}
-		return placeholder(cmd, "get")
+		return runGet(cmd.Context(), cmd, options, args[0])
 	}
 	registry.register(root, get.metadata)
 	root.AddCommand(get.Command)
