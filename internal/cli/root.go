@@ -151,7 +151,7 @@ func registerCommands(root *cobra.Command, registry *commandRegistry, options *r
 	root.AddCommand(packs.Command)
 
 	addPackCommand(packs.Command, registry, packListMetadata(), func(cmd *cobra.Command, _ []string) error {
-		return placeholder(cmd, "packs list")
+		return runPackList(cmd, options)
 	})
 	addPackCommand(packs.Command, registry, packInstallMetadata(), func(cmd *cobra.Command, args []string) error {
 		if err := validatePackID(args[0]); err != nil {
