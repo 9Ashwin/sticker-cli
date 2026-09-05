@@ -60,6 +60,47 @@ func runPackInstall(cmd *cobra.Command, options *rootOptions, args []string) err
 	}, false)
 }
 
+func runPackUpdate(cmd *cobra.Command, options *rootOptions, args []string) error {
+	dryRun, err := cmd.Flags().GetBool("dry-run")
+	if err != nil {
+		return err
+	}
+	home, err := resolveHome(options)
+	if err != nil {
+		return err
+	}
+	if dryRun {
+		plan, err := packs.PlanUpdate(cmd.Context(), packs.UpdateOptions{Home: home, PackID: args[0]})
+		if err != nil {
+			return normalizePackError(err)
+		}
+		return writeResult(cmd, options, map[string]any{
+			"source":         plan.Source,
+			"target":         plan.Target,
+			"pack":           plan.Pack,
+			"revision":       plan.Revision,
+			"added":          plan.Added,
+			"reused":         plan.Reused,
+			"download_bytes": plan.DownloadBytes,
+			"dry_run":        true,
+		}, false)
+	}
+	result, err := packs.Update(cmd.Context(), packs.UpdateOptions{Home: home, PackID: args[0]})
+	if err != nil {
+		return normalizePackError(err)
+	}
+	return writeResult(cmd, options, map[string]any{
+		"source":         result.Source,
+		"target":         result.Target,
+		"pack":           result.Pack,
+		"revision":       result.Revision,
+		"added":          result.Added,
+		"reused":         result.Reused,
+		"download_bytes": result.DownloadBytes,
+		"dry_run":        false,
+	}, false)
+}
+
 func runPackList(cmd *cobra.Command, options *rootOptions) error {
 	source, err := cmd.Flags().GetString("source")
 	if err != nil {

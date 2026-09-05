@@ -145,3 +145,126 @@ func TestPackInstallDryRunReturnsPlanWithoutCreatingHome(t *testing.T) {
 		t.Fatalf("unexpected install output: %s", out.String())
 	}
 }
+
+func TestPackUpdateUsesSavedSource(t *testing.T) {
+	source := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(source, "packs", "unused"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	first := cliTestItem([]byte("GIF89a cli update first"), "first")
+	writeCLIPackVersion(t, source, []library.Item{first}, [][]byte{[]byte("GIF89a cli update first")})
+	home := filepath.Join(t.TempDir(), "library")
+	var out, errOut bytes.Buffer
+	if code := Run(context.Background(), []string{"--home", home, "packs", "install", "curated", "--source", source}, &out, &errOut, "dev", "unknown"); code != 0 {
+		t.Fatalf("install exit %d: %s", code, errOut.String())
+	}
+
+	second := cliTestItem([]byte("GIF89a cli update second"), "second")
+	first.Caption = "updated first"
+	manifestBytes := writeCLIPackVersion(t, source, []library.Item{first, second}, [][]byte{nil, []byte("GIF89a cli update second")})
+	newRevision := sha256.Sum256(manifestBytes)
+
+	out.Reset()
+	errOut.Reset()
+	if code := Run(context.Background(), []string{"--home", home, "packs", "update", "curated", "--dry-run"}, &out, &errOut, "dev", "unknown"); code != 0 {
+		t.Fatalf("update dry-run exit %d: %s", code, errOut.String())
+	}
+	var plan struct {
+		OK   bool `json:"ok"`
+		Data struct {
+			Source        string `json:"source"`
+			Revision      string `json:"revision"`
+			Added         int    `json:"added"`
+			Reused        int    `json:"reused"`
+			DownloadBytes int64  `json:"download_bytes"`
+			DryRun        bool   `json:"dry_run"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(out.Bytes(), &plan); err != nil {
+		t.Fatal(err)
+	}
+	if !plan.OK || plan.Data.Source != source || plan.Data.Revision != hex.EncodeToString(newRevision[:]) || plan.Data.Added != 1 || plan.Data.Reused != 1 || plan.Data.DownloadBytes != second.Size || !plan.Data.DryRun {
+		t.Fatalf("unexpected update plan: %s", out.String())
+	}
+	if errOut.Len() != 0 {
+		t.Fatalf("unexpected dry-run stderr: %s", errOut.String())
+	}
+
+	out.Reset()
+	errOut.Reset()
+	if code := Run(context.Background(), []string{"--home", home, "packs", "update", "curated"}, &out, &errOut, "dev", "unknown"); code != 0 {
+		t.Fatalf("update exit %d: %s", code, errOut.String())
+	}
+	if !bytes.Contains(out.Bytes(), []byte(`"revision":"`+hex.EncodeToString(newRevision[:])+`"`)) || !bytes.Contains(out.Bytes(), []byte(`"added":1`)) || !bytes.Contains(out.Bytes(), []byte(`"reused":1`)) {
+		t.Fatalf("unexpected update output: %s", out.String())
+	}
+	if _, err := os.Stat(filepath.Join(home, filepath.FromSlash(second.Filename))); err != nil {
+		t.Fatalf("updated image was not published: %v", err)
+	}
+}
+
+func cliTestItem(content []byte, caption string) library.Item {
+	md5Sum := md5.Sum(content)
+	shaSum := sha256.Sum256(content)
+	id := hex.EncodeToString(md5Sum[:])
+	return library.Item{MD5: id, SHA256: hex.EncodeToString(shaSum[:]), Filename: "emoticons/" + id + ".gif", Format: "gif", Size: int64(len(content)), Caption: caption}
+}
+
+func writeCLIPackVersion(t *testing.T, source string, items []library.Item, contents [][]byte) []byte {
+	t.Helper()
+	manifestBytes, err := json.Marshal(library.Manifest{SchemaVersion: 1, Collection: "curated", Items: items})
+	if err != nil {
+		t.Fatal(err)
+	}
+	manifestSum := sha256.Sum256(manifestBytes)
+	var size int64
+	for _, item := range items {
+		size += item.Size
+	}
+	directory := struct {
+		SchemaVersion int `json:"schema_version"`
+		Packs         []struct {
+			ID             string `json:"id"`
+			Name           string `json:"name"`
+			Description    string `json:"description"`
+			Manifest       string `json:"manifest"`
+			ManifestSHA256 string `json:"manifest_sha256"`
+			Count          int    `json:"count"`
+			Size           int64  `json:"size"`
+		} `json:"packs"`
+	}{SchemaVersion: 1}
+	directory.Packs = append(directory.Packs, struct {
+		ID             string `json:"id"`
+		Name           string `json:"name"`
+		Description    string `json:"description"`
+		Manifest       string `json:"manifest"`
+		ManifestSHA256 string `json:"manifest_sha256"`
+		Count          int    `json:"count"`
+		Size           int64  `json:"size"`
+	}{"curated", "Curated", "CLI update fixture", "packs/curated.json", hex.EncodeToString(manifestSum[:]), len(items), size})
+	directoryBytes, err := json.Marshal(directory)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(source, "packs"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(source, library.EmoticonsDirectory), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(source, "packs.json"), directoryBytes, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(source, "packs", "curated.json"), manifestBytes, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	for index, content := range contents {
+		if content == nil {
+			continue
+		}
+		if err := os.WriteFile(filepath.Join(source, filepath.FromSlash(items[index].Filename)), content, 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return manifestBytes
+}
