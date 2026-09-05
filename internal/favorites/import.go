@@ -97,18 +97,12 @@ func Import(ctx context.Context, options ImportOptions) (ImportResult, error) {
 
 	if !plan.needsPublish {
 		result.Committed = true
-		if stagingRoot != "" {
-			_ = os.RemoveAll(stagingRoot)
-		}
 		return result, nil
 	}
 
 	result, err = publishImport(ctx, plan, staging, result)
 	if err != nil {
 		return result, err
-	}
-	if stagingRoot != "" {
-		_ = os.RemoveAll(stagingRoot)
 	}
 	result.Committed = true
 	return result, nil
