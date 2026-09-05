@@ -1,0 +1,107 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build ${{ matrix.name }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: linux-amd64
+            goos: linux
+            goarch: amd64
+            binary: sticker
+            archive: sticker_linux_amd64.tar.gz
+          - name: linux-arm64
+            goos: linux
+            goarch: arm64
+            binary: sticker
+            archive: sticker_linux_arm64.tar.gz
+          - name: darwin-amd64
+            goos: darwin
+            goarch: amd64
+            binary: sticker
+            archive: sticker_darwin_amd64.tar.gz
+          - name: darwin-arm64
+            goos: darwin
+            goarch: arm64
+            binary: sticker
+            archive: sticker_darwin_arm64.tar.gz
+          - name: windows-amd64
+            goos: windows
+            goarch: amd64
+            binary: sticker.exe
+            archive: sticker_windows_amd64.zip
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.26.8'
+
+      - name: Build and package
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: '0'
+          VERSION: ${{ github.ref_name }}
+          COMMIT: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          rm -rf package dist
+          mkdir -p package dist
+          go build -trimpath -ldflags "-s -w -X main.version=${VERSION} -X main.commit=${COMMIT}" -o "package/${{ matrix.binary }}" ./cmd/sticker
+          printf '%s\n' "${VERSION}" > package/VERSION
+          cp LICENSE package/LICENSE
+          (cd package && sha256sum "${{ matrix.binary }}" > checksums.txt)
+          if [[ "${{ matrix.goos }}" == "windows" ]]; then
+            (cd package && zip -q "../dist/${{ matrix.archive }}" "${{ matrix.binary }}" LICENSE VERSION checksums.txt)
+          else
+            tar -C package -czf "dist/${{ matrix.archive }}" "${{ matrix.binary }}" LICENSE VERSION checksums.txt
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.name }}
+          path: dist/${{ matrix.archive }}
+          if-no-files-found: error
+
+  publish:
+    name: Publish release
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          merge-multiple: true
+
+      - name: Add installation entries and checksums
+        run: |
+          set -euo pipefail
+          cp scripts/install.sh scripts/install.ps1 release-assets/
+          (cd release-assets && sha256sum sticker_*.tar.gz sticker_*.zip install.sh install.ps1 > checksums.txt)
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release create "${GITHUB_REF_NAME}" release-assets/* \
+            --repo "${GITHUB_REPOSITORY}" \
+            --verify-tag \
+            --title "${GITHUB_REF_NAME}" \
+            --generate-notes
