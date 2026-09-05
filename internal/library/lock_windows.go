@@ -41,6 +41,10 @@ func acquireLock(ctx context.Context, root string, exclusive bool, timeout time.
 		return nil, wrapError("validation", "unsafe_path", "Use a real library directory.", err)
 	}
 	sticker := filepath.Join(root, ".sticker")
+	if err := os.Mkdir(sticker, 0o700); err != nil && !errors.Is(err, os.ErrExist) {
+		_ = rootAnchor.Close()
+		return nil, wrapError("io", "write_failed", "Choose a writable library directory.", err)
+	}
 	stickerAnchor, err := openDirectoryNoReparse(sticker)
 	if err != nil {
 		_ = rootAnchor.Close()
