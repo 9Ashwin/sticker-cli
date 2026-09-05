@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"hash"
 	"io"
 	"net"
 	"net/http"
@@ -64,11 +65,10 @@ type InstallResult struct {
 }
 
 type preparedInstall struct {
-	root      *library.Library
-	home      string
-	source    Source
-	snapshot  packSnapshot
-	installed bool
+	root     *library.Library
+	home     string
+	source   Source
+	snapshot packSnapshot
 }
 
 type stagedImage struct {
@@ -135,7 +135,7 @@ func prepareInstall(ctx context.Context, options PlanOptions) (preparedInstall, 
 	if err := checkPersonalConflicts(personal, snapshot.manifest, options.PackID); err != nil {
 		return preparedInstall{}, err
 	}
-	return preparedInstall{root: root, home: home, source: source, snapshot: snapshot, installed: installed}, nil
+	return preparedInstall{root: root, home: home, source: source, snapshot: snapshot}, nil
 }
 
 func validateInstalledForSnapshot(state installedState, source Source, revision, id string) error {
@@ -201,23 +201,18 @@ func Install(ctx context.Context, options InstallOptions) (InstallResult, error)
 		Revision: plan.Revision,
 	}
 
-	// An already installed revision has passed full image verification. It is
-	// safe to return without creating staging files or rewriting state.
-	if prepared.installed && plan.Added == 0 {
-		result.Reused = plan.Reused
-		return result, nil
-	}
-
 	var stagingRoot string
 	staged := make(map[string]stagedImage)
-	if plan.Added > 0 {
-		stagingRoot, err = createStagingDirectory(prepared.root)
-		if err != nil {
-			return InstallResult{}, err
-		}
-		if err := os.Mkdir(filepath.Join(stagingRoot, library.EmoticonsDirectory), 0o700); err != nil {
-			return InstallResult{}, wrapError("io", "write_failed", "cannot create the staging image directory", "Choose a writable library directory.", err)
-		}
+	stagingRoot, err = createStagingDirectory(prepared.root)
+	if err != nil {
+		return InstallResult{}, err
+	}
+	stagingLibrary, err := library.New(stagingRoot)
+	if err != nil {
+		return InstallResult{}, fromLibraryError(err)
+	}
+	if err := stagingLibrary.EnsureRelativeDirectory(library.EmoticonsDirectory); err != nil {
+		return InstallResult{}, fromLibraryError(err)
 	}
 	for _, item := range prepared.snapshot.manifest.Items {
 		if err := contextErr(ctx); err != nil {
@@ -236,8 +231,7 @@ func Install(ctx context.Context, options InstallOptions) (InstallResult, error)
 			staged[item.MD5] = stagedImage{root: candidate}
 			continue
 		}
-		current := filepath.Join(stagingRoot, filepath.FromSlash(item.Filename))
-		if err := downloadImage(ctx, prepared.source, item, current, options.HTTPClient, options.Backoff); err != nil {
+		if err := downloadImage(ctx, prepared.source, item, stagingRoot, options.HTTPClient, options.Backoff); err != nil {
 			return InstallResult{}, err
 		}
 		staged[item.MD5] = stagedImage{root: stagingRoot}
@@ -322,7 +316,7 @@ func publishInstall(ctx context.Context, prepared preparedInstall, staged map[st
 			}
 			stagedItem, ok := staged[item.MD5]
 			if !ok {
-				return fromLibraryError(err)
+				return newError("integrity", "invalid_image", fmt.Sprintf("staged image %s is missing", item.MD5), "Retry the installation to download the missing image.")
 			}
 			data, err := readStagedItem(ctx, stagedItem.root, item)
 			if err != nil {
@@ -407,7 +401,7 @@ func readStagedItem(ctx context.Context, stageRoot string, item library.Item) ([
 	return data, nil
 }
 
-func downloadImage(ctx context.Context, source Source, item library.Item, destination string, client *http.Client, backoff func(context.Context, time.Duration) error) error {
+func downloadImage(ctx context.Context, source Source, item library.Item, stagingRoot string, client *http.Client, backoff func(context.Context, time.Duration) error) error {
 	if source.IsLocal() {
 		file, err := library.OpenRelative(ctx, source.LocalRoot, filepath.FromSlash(item.Filename))
 		if err != nil {
@@ -420,49 +414,40 @@ func downloadImage(ctx context.Context, source Source, item library.Item, destin
 			return fromLibraryError(err)
 		}
 		defer func() { _ = file.Close() }()
-		return writeStagedStream(ctx, file, item, destination, false)
+		return writeStagedStream(ctx, stagingRoot, file, item, false)
 	}
 	fetcher := newFetcher(client, backoff)
-	return fetcher.downloadImage(ctx, source.manifestURL(item.Filename), item, destination)
+	return fetcher.downloadImage(ctx, source.manifestURL(item.Filename), item, stagingRoot)
 }
 
-func writeStagedStream(ctx context.Context, source io.Reader, item library.Item, destination string, network bool) error {
-	file, err := os.OpenFile(destination, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
+func writeStagedStream(ctx context.Context, stagingRoot string, source io.Reader, item library.Item, network bool) error {
+	stageLibrary, err := library.New(stagingRoot)
 	if err != nil {
-		return wrapError("io", "write_failed", "cannot create staged image", "Choose a writable staging directory.", err)
-	}
-	md5Hash := md5.New()
-	shaHash := sha256.New()
-	count, copyErr := copyWithContext(ctx, io.MultiWriter(file, md5Hash, shaHash), io.LimitReader(source, item.Size+1))
-	if copyErr != nil {
-		_ = file.Close()
-		if errors.Is(copyErr, context.Canceled) || errors.Is(copyErr, context.DeadlineExceeded) {
-			return installCancelled(copyErr)
-		}
-		if network {
-			return &Error{Kind: "network", Subtype: "request_failed", Message: "source image transfer failed", Hint: "Retry the installation later.", Retryable: true, Err: copyErr}
-		}
-		return wrapError("io", "read_failed", "source image transfer failed", "Check the source image.", copyErr)
-	}
-	if syncErr := file.Sync(); syncErr != nil {
-		_ = file.Close()
-		return wrapError("io", "write_failed", "cannot sync staged image", "Check available disk space.", syncErr)
-	}
-	if closeErr := file.Close(); closeErr != nil {
-		return wrapError("io", "write_failed", "cannot close staged image", "Retry the operation.", closeErr)
-	}
-	if count != item.Size || hex.EncodeToString(md5Hash.Sum(nil)) != item.MD5 || hex.EncodeToString(shaHash.Sum(nil)) != item.SHA256 {
-		_ = os.Remove(destination)
-		return newError("integrity", "hash_mismatch", fmt.Sprintf("source image %s does not match its manifest", item.MD5), "Use a stable source revision and retry the installation.")
-	}
-	if err := library.VerifyFile(ctx, destination, item, library.DefaultLimits()); err != nil {
-		_ = os.Remove(destination)
 		return fromLibraryError(err)
 	}
-	return nil
+	digester := newImageDigestReader(source, network)
+	err = stageLibrary.WriteRelativeAtomicFrom(ctx, item.Filename, digester, item.Size, func(count int64) error {
+		return digester.validate(item, count)
+	})
+	if err == nil {
+		return nil
+	}
+	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		return installCancelled(err)
+	}
+	if network {
+		var transferErr *networkReadError
+		if errors.As(err, &transferErr) {
+			return &Error{Kind: "network", Subtype: "request_failed", Message: "source image transfer failed", Hint: "Retry the installation later.", Retryable: true, Err: transferErr.Err}
+		}
+	}
+	if _, ok := err.(*Error); ok {
+		return err
+	}
+	return fromLibraryError(err)
 }
 
-func (f fetcher) downloadImage(ctx context.Context, target string, item library.Item, destination string) error {
+func (f fetcher) downloadImage(ctx context.Context, target string, item library.Item, stagingRoot string) error {
 	for attempt := 1; attempt <= maxAttempts; attempt++ {
 		if err := contextErr(ctx); err != nil {
 			return installCancelled(err)
@@ -501,7 +486,7 @@ func (f fetcher) downloadImage(ctx context.Context, target string, item library.
 			return &Error{Kind: "network", Subtype: "http_error", Message: fmt.Sprintf("source returned HTTP %d for image %s", response.StatusCode, item.MD5), Hint: "Check the source URL and retry later.", Retryable: statusRetry, Err: fmt.Errorf("HTTP %d", response.StatusCode)}
 		}
 
-		transferErr := writeStagedStream(ctx, response.Body, item, destination, true)
+		transferErr := writeStagedStream(ctx, stagingRoot, response.Body, item, true)
 		_ = response.Body.Close()
 		if transferErr == nil {
 			return nil
@@ -513,14 +498,55 @@ func (f fetcher) downloadImage(ctx context.Context, target string, item library.
 			}
 			continue
 		}
-		_ = os.Remove(destination)
 		return transferErr
 	}
 	return newError("network", "request_failed", "source image request failed", "Retry the operation later.")
 }
 
-func copyWithContext(ctx context.Context, dst io.Writer, src io.Reader) (int64, error) {
-	return io.CopyBuffer(dst, &contextReader{ctx: ctx, reader: src}, make([]byte, 32*1024))
+type networkReadError struct {
+	Err error
+}
+
+func (e *networkReadError) Error() string { return e.Err.Error() }
+
+func (e *networkReadError) Unwrap() error { return e.Err }
+
+type imageDigestReader struct {
+	source  io.Reader
+	network bool
+	md5Hash hash.Hash
+	shaHash hash.Hash
+	header  []byte
+}
+
+func newImageDigestReader(source io.Reader, network bool) *imageDigestReader {
+	return &imageDigestReader{source: source, network: network, md5Hash: md5.New(), shaHash: sha256.New()}
+}
+
+func (r *imageDigestReader) Read(p []byte) (int, error) {
+	n, err := r.source.Read(p)
+	if n > 0 {
+		_, _ = r.md5Hash.Write(p[:n])
+		_, _ = r.shaHash.Write(p[:n])
+		if len(r.header) < 12 {
+			need := min(12-len(r.header), n)
+			r.header = append(r.header, p[:need]...)
+		}
+	}
+	if err != nil && err != io.EOF && r.network {
+		return n, &networkReadError{Err: err}
+	}
+	return n, err
+}
+
+func (r *imageDigestReader) validate(item library.Item, count int64) error {
+	if count != item.Size || hex.EncodeToString(r.md5Hash.Sum(nil)) != item.MD5 || hex.EncodeToString(r.shaHash.Sum(nil)) != item.SHA256 {
+		return newError("integrity", "hash_mismatch", fmt.Sprintf("source image %s does not match its manifest", item.MD5), "Use a stable source revision and retry the installation.")
+	}
+	if !imageSignature(r.header, item.Format) {
+		return newError("integrity", "invalid_image", fmt.Sprintf("source image %s has an invalid %s signature", item.MD5, item.Format), "Use the original image in its declared format.")
+	}
+	return nil
 }
 
 type contextReader struct {

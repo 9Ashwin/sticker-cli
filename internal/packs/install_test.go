@@ -501,6 +501,20 @@ func TestInstallCancellationLeavesStateUnpublished(t *testing.T) {
 	}
 }
 
+func TestPublishInstallRejectsMissingStagedImageBeforeState(t *testing.T) {
+	fixture := newInstallFixture(t)
+	prepared, err := prepareInstall(context.Background(), PlanOptions{Home: filepath.Join(t.TempDir(), "library"), Source: fixture.root, PackID: "curated"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	result := InstallResult{Source: prepared.source.Canonical, Target: prepared.root.Root, Pack: prepared.snapshot.pack, Revision: prepared.snapshot.pack.Revision}
+	_, err = publishInstall(context.Background(), prepared, map[string]stagedImage{}, result, nil)
+	assertPackError(t, err, "integrity", "invalid_image")
+	if _, installed, stateErr := readInstalledState(prepared.home, "curated"); stateErr != nil || installed {
+		t.Fatalf("missing staged image published state: %v, %v", stateErr, installed)
+	}
+}
+
 func TestConcurrentInstallPublishesOneState(t *testing.T) {
 	fixture := newInstallFixture(t)
 	home := filepath.Join(t.TempDir(), "library")
