@@ -35,9 +35,10 @@ cleanup() {
 		rm -f "$destination/SKILL.md.tmp" 2>/dev/null || true
 		rmdir "$destination" 2>/dev/null || true
 	fi
+	trap - EXIT
 	exit "$status"
 }
-trap cleanup EXIT HUP INT TERM
+trap cleanup EXIT
 
 umask 022
 cp "$source_dir/SKILL.md" "$destination/SKILL.md.tmp"
