@@ -170,7 +170,7 @@ func registerCommands(root *cobra.Command, registry *commandRegistry, options *r
 		if err := validatePackID(args[0]); err != nil {
 			return err
 		}
-		return placeholder(cmd, "packs remove")
+		return runPackRemove(cmd, options, args)
 	})
 
 	search := newCommand(searchMetadata())
