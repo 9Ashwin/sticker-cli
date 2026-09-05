@@ -40,6 +40,7 @@ type ImportResult struct {
 type importPlan struct {
 	target            *library.Library
 	source            *library.Library
+	sourceCollections Collections
 	plannedItems      []plannedImportItem
 	result            ImportResult
 	needsPublish      bool
@@ -96,12 +97,19 @@ func Import(ctx context.Context, options ImportOptions) (ImportResult, error) {
 	}
 
 	if !plan.needsPublish {
+		if err := mergeImportedCollections(ctx, plan); err != nil {
+			result.Failed++
+			return result, err
+		}
 		result.Committed = true
 		return result, nil
 	}
 
 	result, err = publishImport(ctx, plan, staging, result)
 	if err != nil {
+		return result, err
+	}
+	if err := mergeImportedCollections(ctx, plan); err != nil {
 		return result, err
 	}
 	result.Committed = true
@@ -130,14 +138,22 @@ func prepareImport(ctx context.Context, options ImportOptions) (importPlan, erro
 	if err != nil {
 		return importPlan{}, err
 	}
+	sourceCollections, _, err := readOptionalExtension(ctx, source, sourceManifest)
+	if err != nil {
+		return importPlan{}, err
+	}
 	personal, err := target.ReadManifest(ctx)
 	if err != nil {
+		return importPlan{}, err
+	}
+	if _, err := readCollections(ctx, target, personal); err != nil {
 		return importPlan{}, err
 	}
 
 	plan := importPlan{
 		target:            target,
 		source:            source,
+		sourceCollections: sourceCollections,
 		result:            ImportResult{DryRun: options.DryRun},
 		sameRoot:          target.Root == source.Root,
 		overwriteCaptions: options.OverwriteCaptions,
