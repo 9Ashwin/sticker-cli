@@ -124,4 +124,24 @@ func TestPackInstallDryRunReturnsPlanWithoutCreatingHome(t *testing.T) {
 	if _, err := os.Stat(home); !os.IsNotExist(err) {
 		t.Fatalf("dry-run created the home directory: %v", err)
 	}
+	out.Reset()
+	errOut.Reset()
+	if code := Run(context.Background(), []string{"--home", home, "packs", "install", "curated", "--source", source}, &out, &errOut, "dev", "unknown"); code != 0 {
+		t.Fatalf("exit %d: %s", code, errOut.String())
+	}
+	var installed struct {
+		OK   bool `json:"ok"`
+		Data struct {
+			Added         int   `json:"added"`
+			Reused        int   `json:"reused"`
+			DownloadBytes int64 `json:"download_bytes"`
+			DryRun        bool  `json:"dry_run"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(out.Bytes(), &installed); err != nil {
+		t.Fatal(err)
+	}
+	if !installed.OK || installed.Data.Added != 1 || installed.Data.Reused != 0 || installed.Data.DownloadBytes != int64(len(content)) || installed.Data.DryRun {
+		t.Fatalf("unexpected install output: %s", out.String())
+	}
 }

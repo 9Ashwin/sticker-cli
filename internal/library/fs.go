@@ -53,6 +53,42 @@ func (l *Library) ensureDirectory(path string) error {
 	return nil
 }
 
+// EnsureRelativeDirectory creates a directory beneath the library root while
+// rejecting symlinked path components. It is used by higher-level operations
+// for their private staging and state directories before they publish files.
+func (l *Library) EnsureRelativeDirectory(relative string) error {
+	if relative == "" || filepath.IsAbs(filepath.FromSlash(relative)) || filepath.Clean(filepath.FromSlash(relative)) != filepath.FromSlash(relative) || filepath.VolumeName(filepath.FromSlash(relative)) != "" {
+		return errorf("validation", "unsafe_path", "Use a directory inside the library root.", "path escapes library root")
+	}
+	if err := l.ensureRoot(true); err != nil {
+		return err
+	}
+	if relative == "." {
+		return nil
+	}
+	return ensureRelativeDirectoryPlatform(l.Root, filepath.FromSlash(relative))
+}
+
+// CreateRelativeTempDirectory creates a private temporary directory beneath
+// an existing directory inside the library root. Unix implementations create
+// it through an anchored directory descriptor to avoid path-swap races.
+func (l *Library) CreateRelativeTempDirectory(relative, pattern string) (string, error) {
+	if relative == "" || filepath.IsAbs(filepath.FromSlash(relative)) || filepath.Clean(filepath.FromSlash(relative)) != filepath.FromSlash(relative) || filepath.VolumeName(filepath.FromSlash(relative)) != "" {
+		return "", errorf("validation", "unsafe_path", "Use a directory inside the library root.", "path escapes library root")
+	}
+	if pattern == "" {
+		return "", errorf("validation", "invalid_argument", "Provide a temporary directory pattern.", "temporary directory pattern is empty")
+	}
+	if err := l.ensureRoot(true); err != nil {
+		return "", err
+	}
+	parent := filepath.FromSlash(relative)
+	if err := ensureRelativeDirectoryPlatform(l.Root, parent); err != nil {
+		return "", err
+	}
+	return createRelativeTempDirectoryPlatform(l.Root, parent, pattern)
+}
+
 func (l *Library) rootPath(relative string) (string, error) {
 	if relative == "" || filepath.IsAbs(relative) || filepath.Clean(relative) != relative || filepath.VolumeName(relative) != "" {
 		return "", errorf("validation", "unsafe_path", "Use a path inside the library root.", "path escapes library root")
@@ -122,6 +158,15 @@ func readBoundedRelative(ctx context.Context, root, relative string, limit int64
 // the returned error according to their own boundary contract.
 func ReadRelative(ctx context.Context, root, relative string, limit int64) ([]byte, error) {
 	return readBoundedRelative(ctx, root, relative, limit)
+}
+
+// OpenRelative opens a file beneath root without following symbolic links in
+// any path component. The caller owns and must close the returned file.
+func OpenRelative(ctx context.Context, root, relative string) (*os.File, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	return openRelativeNoFollow(root, relative)
 }
 
 func rejectDuplicateJSONKeys(data []byte) error {
