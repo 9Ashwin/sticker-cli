@@ -179,6 +179,30 @@ func TestWriteCancellationAndCommittedAfterError(t *testing.T) {
 	}
 }
 
+func TestAtomicReplaceExistingTargetAndWriteFailure(t *testing.T) {
+	root := t.TempDir()
+	library, _ := New(root)
+	if err := library.WriteManifest(context.Background(), Manifest{SchemaVersion: 1, Collection: "personal", Items: []Item{}}); err != nil {
+		t.Fatal(err)
+	}
+	item := testMetadataItem(42)
+	if err := library.WriteManifest(context.Background(), Manifest{SchemaVersion: 1, Collection: "personal", Items: []Item{item}}); err != nil {
+		t.Fatal(err)
+	}
+	got, err := library.ReadManifest(context.Background())
+	if err != nil || len(got.Items) != 1 || got.Items[0].MD5 != item.MD5 {
+		t.Fatalf("existing manifest was not atomically replaced: %#v, %v", got, err)
+	}
+	library.Hooks.BeforeManifest = func() error { return errors.New("simulated disk failure") }
+	if err := library.WriteManifest(context.Background(), Manifest{SchemaVersion: 1, Collection: "personal", Items: []Item{}}); err == nil {
+		t.Fatal("injected write failure succeeded")
+	}
+	got, err = library.ReadManifest(context.Background())
+	if err != nil || len(got.Items) != 1 {
+		t.Fatalf("write failure changed existing target: %#v, %v", got, err)
+	}
+}
+
 func TestLockCancellation(t *testing.T) {
 	root := t.TempDir()
 	first, err := acquireLock(context.Background(), root, true, time.Second)

@@ -7,8 +7,6 @@ import (
 	"path/filepath"
 )
 
-func renameAtomic(from, to string) error { return os.Rename(from, to) }
-
 func syncDirectory(path string) error {
 	directory, err := os.Open(filepath.Clean(path))
 	if err != nil {

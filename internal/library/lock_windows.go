@@ -26,6 +26,7 @@ var (
 
 type fileLock struct {
 	file    *os.File
+	anchors []*os.File
 	overlap syscall.Overlapped
 	once    sync.Once
 	err     error
@@ -35,15 +36,23 @@ func acquireLock(ctx context.Context, root string, exclusive bool, timeout time.
 	if err := ctx.Err(); err != nil {
 		return nil, errorf("cancelled", "interrupted", "Retry the operation when ready.", "library lock acquisition cancelled")
 	}
-	sticker := filepath.Join(root, ".sticker")
-	if err := ensureLockDirectory(sticker); err != nil {
-		return nil, err
-	}
-	file, err := os.OpenFile(filepath.Join(sticker, "write.lock"), os.O_CREATE|os.O_RDWR, 0o600)
+	rootAnchor, err := openDirectoryNoReparse(root)
 	if err != nil {
+		return nil, wrapError("validation", "unsafe_path", "Use a real library directory.", err)
+	}
+	sticker := filepath.Join(root, ".sticker")
+	stickerAnchor, err := openDirectoryNoReparse(sticker)
+	if err != nil {
+		_ = rootAnchor.Close()
+		return nil, wrapError("validation", "unsafe_path", "Remove links from the library path.", err)
+	}
+	file, err := openLockNoReparse(filepath.Join(sticker, "write.lock"))
+	if err != nil {
+		_ = stickerAnchor.Close()
+		_ = rootAnchor.Close()
 		return nil, wrapError("io", "write_failed", "Choose a writable library directory.", err)
 	}
-	lock := &fileLock{file: file}
+	lock := &fileLock{file: file, anchors: []*os.File{stickerAnchor, rootAnchor}}
 	flags := uint32(lockfileFailImmediately)
 	if exclusive {
 		flags |= lockfileExclusive
@@ -54,7 +63,7 @@ func acquireLock(ctx context.Context, root string, exclusive bool, timeout time.
 	defer ticker.Stop()
 	for {
 		if err := ctx.Err(); err != nil {
-			_ = file.Close()
+			_ = lock.Close()
 			return nil, errorf("cancelled", "interrupted", "Retry the operation when ready.", "library lock acquisition cancelled")
 		}
 		result, _, callErr := lockFileExProc.Call(file.Fd(), uintptr(flags), 0, 1, 0, uintptr(unsafe.Pointer(&lock.overlap)))
@@ -62,15 +71,15 @@ func acquireLock(ctx context.Context, root string, exclusive bool, timeout time.
 			return lock, nil
 		}
 		if callErr != syscall.Errno(33) && !errors.Is(callErr, syscall.Errno(997)) {
-			_ = file.Close()
+			_ = lock.Close()
 			return nil, wrapError("io", "write_failed", "Check the library lock permissions.", callErr)
 		}
 		select {
 		case <-ctx.Done():
-			_ = file.Close()
+			_ = lock.Close()
 			return nil, errorf("cancelled", "interrupted", "Retry the operation when ready.", "library lock acquisition cancelled")
 		case <-deadline.C:
-			_ = file.Close()
+			_ = lock.Close()
 			return nil, errorf("conflict", "library_busy", "Retry after the other operation finishes.", "library lock is busy")
 		case <-ticker.C:
 		}
@@ -99,20 +108,11 @@ func (l *fileLock) Close() error {
 		if closeErr := l.file.Close(); l.err == nil {
 			l.err = closeErr
 		}
+		for _, anchor := range l.anchors {
+			if closeErr := anchor.Close(); l.err == nil {
+				l.err = closeErr
+			}
+		}
 	})
 	return l.err
-}
-
-func ensureLockDirectory(path string) error {
-	if err := os.Mkdir(path, 0o700); err != nil && !errors.Is(err, os.ErrExist) {
-		return wrapError("io", "write_failed", "Choose a writable library directory.", err)
-	}
-	info, err := os.Lstat(path)
-	if err != nil {
-		return wrapError("io", "read_failed", "Check the library lock directory.", err)
-	}
-	if info.Mode()&os.ModeSymlink != 0 || !info.IsDir() {
-		return errorf("validation", "unsafe_path", "Remove links from the library path.", "lock directory is not a directory")
-	}
-	return nil
 }

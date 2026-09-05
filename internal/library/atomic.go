@@ -5,7 +5,6 @@ import (
 	"errors"
 	"io"
 	"os"
-	"path/filepath"
 )
 
 func (l *Library) atomicReplace(ctx context.Context, target string, data []byte) error {
@@ -17,59 +16,20 @@ func (l *Library) atomicReplace(ctx context.Context, target string, data []byte)
 			return wrapError("io", "write_failed", "Retry the operation.", err)
 		}
 	}
-	if err := rejectExistingSymlink(target); err != nil {
-		return err
-	}
-	directory := filepath.Dir(target)
-	temporary, err := os.CreateTemp(directory, ".manifest-*.tmp")
-	if err != nil {
-		return wrapError("io", "write_failed", "Choose a writable library directory.", err)
-	}
-	temporaryName := temporary.Name()
-	removeTemporary := true
-	defer func() {
-		_ = temporary.Close()
-		if removeTemporary {
-			_ = os.Remove(temporaryName)
-		}
-	}()
-	if err := temporary.Chmod(0o600); err != nil {
-		return wrapError("io", "write_failed", "Choose a writable library directory.", err)
-	}
-	if _, err := copyContext(ctx, temporary, bytesReader(data)); err != nil {
-		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
-			return errorf("cancelled", "interrupted", "Retry the operation when ready.", "manifest write cancelled")
-		}
-		return wrapError("io", "write_failed", "Retry the operation.", err)
-	}
-	if err := temporary.Sync(); err != nil {
-		return wrapError("io", "write_failed", "Check available disk space.", err)
-	}
-	if err := temporary.Close(); err != nil {
-		return wrapError("io", "write_failed", "Retry the operation.", err)
-	}
-	if err := contextErr(ctx); err != nil {
-		return err
-	}
-	if l.Hooks.BeforeRename != nil {
-		if err := l.Hooks.BeforeRename(target); err != nil {
-			return wrapError("io", "write_failed", "Retry the operation.", err)
-		}
-	}
-	if err := renameAtomic(temporaryName, target); err != nil {
-		return wrapError("io", "write_failed", "Retry the operation.", err)
-	}
-	removeTemporary = false
-	if l.Hooks.AfterRename != nil {
-		if err := l.Hooks.AfterRename(target); err != nil {
+	return atomicReplacePlatform(ctx, target, data, l.Hooks)
+}
+
+func finishAtomicRename(target, directory string, hooks Hooks) error {
+	if hooks.AfterRename != nil {
+		if err := hooks.AfterRename(target); err != nil {
 			return &Error{Kind: "io", Subtype: "write_failed", Message: "manifest was committed but directory synchronization failed", Hint: "Read the manifest again before retrying.", Err: err, Committed: true}
 		}
 	}
 	if err := syncDirectory(directory); err != nil {
 		return &Error{Kind: "io", Subtype: "write_failed", Message: "manifest was committed but directory synchronization failed", Hint: "Read the manifest again before retrying.", Err: err, Committed: true}
 	}
-	if l.Hooks.SyncDirectory != nil {
-		if err := l.Hooks.SyncDirectory(directory); err != nil {
+	if hooks.SyncDirectory != nil {
+		if err := hooks.SyncDirectory(directory); err != nil {
 			return &Error{Kind: "io", Subtype: "write_failed", Message: "manifest was committed but directory synchronization failed", Hint: "Read the manifest again before retrying.", Err: err, Committed: true}
 		}
 	}

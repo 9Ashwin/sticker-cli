@@ -10,6 +10,8 @@ import (
 	"sync"
 	"syscall"
 	"time"
+
+	"golang.org/x/sys/unix"
 )
 
 type fileLock struct {
@@ -22,14 +24,46 @@ func acquireLock(ctx context.Context, root string, exclusive bool, timeout time.
 	if err := ctx.Err(); err != nil {
 		return nil, errorf("cancelled", "interrupted", "Retry the operation when ready.", "library lock acquisition cancelled")
 	}
-	sticker := filepath.Join(root, ".sticker")
-	if err := ensureLockDirectory(sticker); err != nil {
-		return nil, err
+	rootFD, err := unix.Open(root, unix.O_RDONLY|unix.O_DIRECTORY|unix.O_NOFOLLOW|unix.O_CLOEXEC, 0)
+	if err != nil {
+		return nil, wrapError("validation", "unsafe_path", "Use a real library directory.", err)
 	}
-	file, err := os.OpenFile(filepath.Join(sticker, "write.lock"), os.O_CREATE|os.O_RDWR|syscall.O_CLOEXEC, 0o600)
+	defer func() { _ = unix.Close(rootFD) }()
+	stickerFD, err := unix.Openat(rootFD, ".sticker", unix.O_RDONLY|unix.O_DIRECTORY|unix.O_NOFOLLOW|unix.O_CLOEXEC, 0)
+	if errors.Is(err, unix.ENOENT) {
+		if mkdirErr := unix.Mkdirat(rootFD, ".sticker", 0o700); mkdirErr != nil && !errors.Is(mkdirErr, unix.EEXIST) {
+			return nil, wrapError("io", "write_failed", "Choose a writable library directory.", mkdirErr)
+		}
+		stickerFD, err = unix.Openat(rootFD, ".sticker", unix.O_RDONLY|unix.O_DIRECTORY|unix.O_NOFOLLOW|unix.O_CLOEXEC, 0)
+	}
+	if err != nil {
+		return nil, wrapError("validation", "unsafe_path", "Remove links from the library path.", err)
+	}
+	defer func() { _ = unix.Close(stickerFD) }()
+	fileFD, err := unix.Openat(stickerFD, "write.lock", unix.O_CREAT|unix.O_RDWR|unix.O_CLOEXEC, 0o600)
+	if errors.Is(err, unix.ENOENT) {
+		// Some older Darwin filesystems do not permit O_CREAT through an
+		// openat directory descriptor; the anchored directory is still held
+		// while this fallback creates the lock file by its checked path.
+		file, pathErr := os.OpenFile(filepath.Join(root, ".sticker", "write.lock"), os.O_CREATE|os.O_RDWR|syscall.O_CLOEXEC, 0o600)
+		if pathErr == nil {
+			var expected, actual unix.Stat_t
+			if statErr := unix.Fstatat(stickerFD, "write.lock", &expected, unix.AT_SYMLINK_NOFOLLOW); statErr != nil || unix.Fstat(int(file.Fd()), &actual) != nil || expected.Dev != actual.Dev || expected.Ino != actual.Ino {
+				_ = file.Close()
+				return nil, errorf("validation", "unsafe_path", "Remove links from the library path.", "lock file escaped its directory")
+			}
+			return acquireExistingLock(ctx, timeout, exclusive, file, rootFD, stickerFD)
+		}
+		err = pathErr
+	}
 	if err != nil {
 		return nil, wrapError("io", "write_failed", "Choose a writable library directory.", err)
 	}
+	file := os.NewFile(uintptr(fileFD), filepath.Join(root, ".sticker", "write.lock"))
+	return acquireExistingLock(ctx, timeout, exclusive, file, rootFD, stickerFD)
+}
+
+func acquireExistingLock(ctx context.Context, timeout time.Duration, exclusive bool, file *os.File, rootFD, stickerFD int) (*fileLock, error) {
 	operation := syscall.LOCK_SH
 	if exclusive {
 		operation = syscall.LOCK_EX
@@ -43,13 +77,13 @@ func acquireLock(ctx context.Context, root string, exclusive bool, timeout time.
 			_ = file.Close()
 			return nil, errorf("cancelled", "interrupted", "Retry the operation when ready.", "library lock acquisition cancelled")
 		}
-		err = syscall.Flock(int(file.Fd()), operation|syscall.LOCK_NB)
-		if err == nil {
+		lockErr := syscall.Flock(int(file.Fd()), operation|syscall.LOCK_NB)
+		if lockErr == nil {
 			return &fileLock{file: file}, nil
 		}
-		if !errors.Is(err, syscall.EWOULDBLOCK) && !errors.Is(err, syscall.EAGAIN) {
+		if !errors.Is(lockErr, syscall.EWOULDBLOCK) && !errors.Is(lockErr, syscall.EAGAIN) {
 			_ = file.Close()
-			return nil, wrapError("io", "write_failed", "Check the library lock permissions.", err)
+			return nil, wrapError("io", "write_failed", "Check the library lock permissions.", lockErr)
 		}
 		select {
 		case <-ctx.Done():
@@ -86,18 +120,4 @@ func (l *fileLock) Close() error {
 		}
 	})
 	return l.err
-}
-
-func ensureLockDirectory(path string) error {
-	if err := os.Mkdir(path, 0o700); err != nil && !errors.Is(err, os.ErrExist) {
-		return wrapError("io", "write_failed", "Choose a writable library directory.", err)
-	}
-	info, err := os.Lstat(path)
-	if err != nil {
-		return wrapError("io", "read_failed", "Check the library lock directory.", err)
-	}
-	if info.Mode()&os.ModeSymlink != 0 || !info.IsDir() {
-		return errorf("validation", "unsafe_path", "Remove links from the library path.", "lock directory is not a directory")
-	}
-	return nil
 }
