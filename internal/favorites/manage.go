@@ -233,7 +233,8 @@ type RemoveResult struct {
 	DryRun           bool `json:"dry_run,omitempty"`
 }
 
-// Remove deletes only personal manifest entries. It never deletes image
+// Remove deletes personal manifest entries and removes their collection
+// relationships while holding one library write lock. It never deletes image
 // files, allowing installed packs and other references to continue using the
 // same original bytes.
 func Remove(ctx context.Context, options RemoveOptions) (RemoveResult, error) {
@@ -268,7 +269,7 @@ func Remove(ctx context.Context, options RemoveOptions) (RemoveResult, error) {
 	}
 
 	var committed int
-	if err := root.UpdateManifest(ctx, func(current library.Manifest) (library.Manifest, error) {
+	if err := root.WithWriteLock(ctx, func(current library.Manifest) error {
 		kept := make([]library.Item, 0, len(current.Items))
 		for _, item := range current.Items {
 			if _, remove := ids[item.MD5]; remove {
@@ -277,8 +278,32 @@ func Remove(ctx context.Context, options RemoveOptions) (RemoveResult, error) {
 			}
 			kept = append(kept, item)
 		}
-		current.Items = kept
-		return current, nil
+		next := current
+		next.Items = kept
+		if committed == 0 {
+			return nil
+		}
+		state, err := readCollections(ctx, root, current)
+		if err != nil {
+			return err
+		}
+		for index := range state.Collections {
+			items := state.Collections[index].Items[:0]
+			for _, item := range state.Collections[index].Items {
+				if _, remove := ids[item.ID]; !remove {
+					items = append(items, item)
+				}
+			}
+			state.Collections[index].Items = items
+		}
+		normalizeCollections(&state)
+		if err := writeCollections(ctx, root, state, next); err != nil {
+			return err
+		}
+		if err := root.WriteManifestLocked(ctx, next); err != nil {
+			return err
+		}
+		return nil
 	}); err != nil {
 		return RemoveResult{}, err
 	}
