@@ -1,6 +1,7 @@
 package favorites
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -83,6 +84,10 @@ func Export(ctx context.Context, options ExportOptions) (ExportResult, error) {
 	}
 	var result ExportResult
 	err = root.WithReadLock(ctx, func(manifest library.Manifest) error {
+		collections, err := readCollections(ctx, root, manifest)
+		if err != nil {
+			return err
+		}
 		manifest.Items = append([]library.Item(nil), manifest.Items...)
 		sort.Slice(manifest.Items, func(i, j int) bool { return manifest.Items[i].MD5 < manifest.Items[j].MD5 })
 		if err := verifyExportItems(ctx, root, manifest.Items); err != nil {
@@ -93,7 +98,7 @@ func Export(ctx context.Context, options ExportOptions) (ExportResult, error) {
 		if options.DryRun {
 			return nil
 		}
-		return exportManifest(ctx, root, destination, manifest)
+		return exportManifest(ctx, root, destination, manifest, collections)
 	})
 	if err != nil {
 		return ExportResult{}, err
@@ -101,7 +106,7 @@ func Export(ctx context.Context, options ExportOptions) (ExportResult, error) {
 	return result, nil
 }
 
-func exportManifest(ctx context.Context, root *library.Library, destination string, manifest library.Manifest) error {
+func exportManifest(ctx context.Context, root *library.Library, destination string, manifest library.Manifest, collections Collections) error {
 	staging, err := createExportStaging(destination)
 	if err != nil {
 		return err
@@ -139,7 +144,14 @@ func exportManifest(ctx context.Context, root *library.Library, destination stri
 	if err := stagingLibrary.WriteRelativeAtomic(ctx, "packs.json", directoryBytes); err != nil {
 		return err
 	}
-	if err := verifyExportOutput(ctx, stagingLibrary, manifest); err != nil {
+	collectionsBytes, err := encodeExportCollections(collections)
+	if err != nil {
+		return err
+	}
+	if err := stagingLibrary.WriteRelativeAtomic(ctx, CollectionsExtensionName, collectionsBytes); err != nil {
+		return err
+	}
+	if err := verifyExportOutput(ctx, stagingLibrary, manifest, collections); err != nil {
 		return err
 	}
 	if err := publishDirectoryNoReplace(staging, destination); err != nil {
@@ -242,7 +254,7 @@ func copyExportItem(ctx context.Context, source, staging *library.Library, item 
 	return staging.VerifyItem(ctx, item)
 }
 
-func verifyExportOutput(ctx context.Context, staging *library.Library, manifest library.Manifest) error {
+func verifyExportOutput(ctx context.Context, staging *library.Library, manifest library.Manifest, collections Collections) error {
 	output, err := staging.ReadManifestRequired(ctx)
 	if err != nil {
 		return err
@@ -255,7 +267,63 @@ func verifyExportOutput(ctx context.Context, staging *library.Library, manifest 
 			return errorf("integrity", "invalid_manifest", "Retry the export from an unchanged personal library.", "export manifest differs from the personal manifest")
 		}
 	}
-	return staging.Validate(ctx, output)
+	if err := staging.Validate(ctx, output); err != nil {
+		return err
+	}
+	actualCollections, present, err := readOptionalExtension(ctx, staging, output)
+	if err != nil {
+		return err
+	}
+	if !present {
+		return errorf("integrity", "invalid_collection", "Retry the export from an unchanged personal library.", "export collections extension is missing")
+	}
+	expectedBytes, err := encodeExportCollections(collections)
+	if err != nil {
+		return err
+	}
+	actualBytes, err := encodeExportCollections(actualCollections)
+	if err != nil {
+		return err
+	}
+	if !bytes.Equal(actualBytes, expectedBytes) {
+		return errorf("integrity", "invalid_collection", "Retry the export from an unchanged personal library.", "export collections extension differs from the personal collections")
+	}
+	return nil
+}
+
+func encodeExportCollections(collections Collections) ([]byte, error) {
+	collections.Collections = append([]Collection(nil), collections.Collections...)
+	for index := range collections.Collections {
+		collections.Collections[index].Items = append([]CollectionItem(nil), collections.Collections[index].Items...)
+	}
+	normalizeCollections(&collections)
+	if err := validateExportCollections(collections); err != nil {
+		return nil, err
+	}
+	data, err := json.MarshalIndent(collections, "", "  ")
+	if err != nil {
+		return nil, errorf("internal", "unexpected", "Retry the export.", "encode export collections: %v", err)
+	}
+	data = append(data, '\n')
+	if int64(len(data)) > library.MaxManifestBytes {
+		return nil, errorf("validation", "output_limit", "Reduce the number of collections and retry.", "export collections exceeds the %d byte limit", library.MaxManifestBytes)
+	}
+	return data, nil
+}
+
+func validateExportCollections(collections Collections) error {
+	if collections.SchemaVersion != 1 || len(collections.Collections) == 0 {
+		return invalidCollections("export collections metadata is empty")
+	}
+	for _, collection := range collections.Collections {
+		if err := validateCollectionID(collection.ID); err != nil {
+			return invalidCollections("export collection ID is invalid")
+		}
+		if err := validateCollectionName(collection.Name); err != nil {
+			return invalidCollections("export collection name is invalid")
+		}
+	}
+	return nil
 }
 
 func encodeExportManifest(manifest library.Manifest) ([]byte, error) {

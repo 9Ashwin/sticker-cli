@@ -2,8 +2,10 @@ package favorites
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"path/filepath"
+	"sort"
 	"sync"
 	"testing"
 
@@ -64,6 +66,75 @@ func TestListPaginatesPersonalManifestAndSortsCaptions(t *testing.T) {
 	if page.Total != 3 || len(page.Items) != 0 || page.HasMore || page.NextOffset != 10 {
 		t.Fatalf("unexpected empty page: %+v", page)
 	}
+}
+
+func TestListCollectionSortsStableKeysAndManifestFallback(t *testing.T) {
+	home := filepath.Join(t.TempDir(), "home")
+	first := addTestFavorite(t, home, "sort-first", "same")
+	second := addTestFavorite(t, home, "sort-second", "same")
+	third := addTestFavorite(t, home, "sort-third", "other")
+	root, err := library.New(home)
+	if err != nil {
+		t.Fatal(err)
+	}
+	state := Collections{SchemaVersion: 1, Collections: []Collection{
+		{ID: DefaultCollectionID, Name: DefaultCollectionName, Position: 0, Items: []CollectionItem{
+			{ID: first.MD5, Position: 0}, {ID: second.MD5, Position: 1}, {ID: third.MD5, Position: 2},
+		}},
+		{ID: "work", Name: "Work", Position: 1, Items: []CollectionItem{
+			{ID: first.MD5, Position: 2, AddedAt: "2026-01-02T03:04:05Z"},
+			{ID: second.MD5, Position: 1, AddedAt: "2026-01-01T03:04:05Z"},
+			{ID: third.MD5, Position: 0},
+		}},
+	}}
+	data, err := json.Marshal(state)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := root.WriteRelativeAtomic(context.Background(), CollectionsRelativePath, data); err != nil {
+		t.Fatal(err)
+	}
+
+	listIDs := func(order string) []string {
+		t.Helper()
+		result, err := List(context.Background(), ListOptions{Home: home, Collection: "work", Sort: order, Limit: 10})
+		if err != nil {
+			t.Fatal(err)
+		}
+		ids := make([]string, 0, len(result.Items))
+		for _, item := range result.Items {
+			ids = append(ids, item.ID)
+		}
+		return ids
+	}
+	if got, want := listIDs("manual"), []string{third.MD5, second.MD5, first.MD5}; !equalStrings(got, want) {
+		t.Fatalf("manual order = %v, want %v", got, want)
+	}
+	if got, want := listIDs("added"), []string{second.MD5, first.MD5, third.MD5}; !equalStrings(got, want) {
+		t.Fatalf("added order = %v, want %v", got, want)
+	}
+	captionIDs := []string{first.MD5, second.MD5}
+	sort.Strings(captionIDs)
+	if got, want := listIDs("caption"), append([]string{third.MD5}, captionIDs...); !equalStrings(got, want) {
+		t.Fatalf("caption order = %v, want %v", got, want)
+	}
+	md5IDs := []string{first.MD5, second.MD5, third.MD5}
+	sort.Strings(md5IDs)
+	if got := listIDs("md5"); !equalStrings(got, md5IDs) {
+		t.Fatalf("md5 order = %v, want %v", got, md5IDs)
+	}
+}
+
+func equalStrings(left, right []string) bool {
+	if len(left) != len(right) {
+		return false
+	}
+	for index := range left {
+		if left[index] != right[index] {
+			return false
+		}
+	}
+	return true
 }
 
 func TestDescribeSupportsDryRunAndExplicitEmptyCaption(t *testing.T) {

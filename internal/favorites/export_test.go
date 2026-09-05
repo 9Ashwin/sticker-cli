@@ -150,6 +150,68 @@ func TestExportDryRunAndDestinationConflictDoNotWrite(t *testing.T) {
 	}
 }
 
+func TestExportRoundTripsCollectionOrderAndMembership(t *testing.T) {
+	parent := t.TempDir()
+	home := filepath.Join(parent, "home")
+	firstPath := filepath.Join(parent, "first.gif")
+	secondPath := filepath.Join(parent, "second.gif")
+	thirdPath := filepath.Join(parent, "third.gif")
+	writeFile(t, firstPath, []byte("GIF89a collection first"))
+	writeFile(t, secondPath, []byte("GIF89a collection second"))
+	writeFile(t, thirdPath, []byte("GIF89a collection third"))
+	first := addFavoriteFromPath(t, home, firstPath, "first")
+	second := addFavoriteFromPath(t, home, secondPath, "second")
+	third := addFavoriteFromPath(t, home, thirdPath, "third")
+	if _, err := CreateCollection(context.Background(), CollectionCreateOptions{Home: home, Name: "work"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Organize(context.Background(), OrganizeOptions{
+		Home: home, Collection: DefaultCollectionID, IDs: []string{first.MD5, second.MD5}, MoveTo: "work",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Organize(context.Background(), OrganizeOptions{
+		Home: home, Collection: "work", Order: []string{second.MD5, first.MD5},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	destination := filepath.Join(parent, "export")
+	if _, err := Export(context.Background(), ExportOptions{Home: home, Destination: destination}); err != nil {
+		t.Fatal(err)
+	}
+	extensionBytes, err := os.ReadFile(filepath.Join(destination, CollectionsExtensionName))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var extension Collections
+	if err := json.Unmarshal(extensionBytes, &extension); err != nil {
+		t.Fatal(err)
+	}
+	if len(extension.Collections) != 2 || extension.Collections[0].ID != DefaultCollectionID || extension.Collections[0].Items[0].ID != third.MD5 || extension.Collections[1].ID != "work" {
+		t.Fatalf("unexpected exported collections: %+v", extension)
+	}
+	if got := extension.Collections[1].Items; len(got) != 2 || got[0].ID != second.MD5 || got[1].ID != first.MD5 || got[0].Position != 0 || got[1].Position != 1 {
+		t.Fatalf("unexpected exported work order: %+v", got)
+	}
+
+	importHome := filepath.Join(parent, "imported")
+	if _, err := Import(context.Background(), ImportOptions{Home: importHome, Source: destination}); err != nil {
+		t.Fatal(err)
+	}
+	collections, err := ListCollections(context.Background(), CollectionListOptions{Home: importHome})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(collections.Collections) != 2 || len(collections.Collections[0].Items) != 1 || collections.Collections[0].Items[0].ID != third.MD5 {
+		t.Fatalf("round-trip default collection = %+v", collections.Collections)
+	}
+	work, ok := findCollection(Collections{Collections: collections.Collections}, "work")
+	if !ok || len(work.Items) != 2 || work.Items[0].ID != second.MD5 || work.Items[1].ID != first.MD5 {
+		t.Fatalf("round-trip work collection = %+v", collections.Collections)
+	}
+}
+
 func TestExportMissingImageLeavesNoStagingDirectory(t *testing.T) {
 	parent := t.TempDir()
 	home := filepath.Join(parent, "home")

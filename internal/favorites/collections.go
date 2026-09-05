@@ -7,6 +7,7 @@ import (
 	"errors"
 	"io"
 	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 	"time"
@@ -393,6 +394,10 @@ func mergeImportedCollections(ctx context.Context, plan importPlan) error {
 		if err != nil {
 			return err
 		}
+		metadataPresent, err := collectionsMetadataPresent(plan.target)
+		if err != nil {
+			return err
+		}
 		for _, sourceCollection := range plan.sourceCollections.Collections {
 			destination, ok := findCollection(state, sourceCollection.ID)
 			if !ok {
@@ -400,12 +405,27 @@ func mergeImportedCollections(ctx context.Context, plan importPlan) error {
 				state.Collections = append(state.Collections, *destination)
 				destination = collectionByID(state, sourceCollection.ID)
 			}
+			if !metadataPresent && sourceCollection.ID == DefaultCollectionID {
+				mergeCollectionItemsInSourceOrder(destination, sourceCollection.Items)
+				continue
+			}
 			appendCollectionItems(destination, sourceCollection.Items)
 		}
 		ensureUnassignedItems(&state, manifest)
 		normalizeCollections(&state)
 		return writeCollections(ctx, plan.target, state, manifest)
 	})
+}
+
+func collectionsMetadataPresent(root *library.Library) (bool, error) {
+	_, err := os.Lstat(filepath.Join(root.Root, filepath.FromSlash(CollectionsRelativePath)))
+	if errors.Is(err, os.ErrNotExist) {
+		return false, nil
+	}
+	if err != nil {
+		return false, errorf("io", "read_failed", "Check the collections metadata permissions.", "cannot inspect collections metadata")
+	}
+	return true, nil
 }
 
 func applyOrganize(state *Collections, manifest library.Manifest, options OrganizeOptions) (OrganizeResult, bool, error) {
@@ -866,6 +886,19 @@ func appendCollectionItems(collection *Collection, items []CollectionItem) int {
 		moved++
 	}
 	return moved
+}
+
+func mergeCollectionItemsInSourceOrder(collection *Collection, source []CollectionItem) {
+	if collection == nil {
+		return
+	}
+	// The source extension is authoritative for a newly created target's
+	// imported relationship and its manual order. Entries that only exist in
+	// the target are restored to the default collection by ensureUnassignedItems.
+	collection.Items = append([]CollectionItem(nil), source...)
+	for index := range collection.Items {
+		collection.Items[index].Position = index
+	}
 }
 
 func nextCollectionItemPosition(collection Collection) int {

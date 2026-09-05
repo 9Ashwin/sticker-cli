@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"sort"
 	"strings"
+	"time"
 	"unicode/utf8"
 
 	"github.com/9Ashwin/sticker-cli/internal/library"
@@ -66,8 +67,17 @@ func List(ctx context.Context, options ListOptions) (stickersearch.Result, error
 				members[member.ID] = member
 			}
 		}
+		if options.Collection == "" {
+			if collection, ok := findCollection(state, DefaultCollectionID); ok {
+				for _, member := range collection.Items {
+					members[member.ID] = member
+				}
+			}
+		}
 		items := make([]stickersearch.Item, 0, len(manifest.Items))
-		for _, item := range manifest.Items {
+		manifestPositions := make(map[string]int, len(manifest.Items))
+		for manifestIndex, item := range manifest.Items {
+			manifestPositions[item.MD5] = manifestIndex
 			member, selected := members[item.MD5]
 			if options.Collection != "" && !selected {
 				continue
@@ -79,29 +89,14 @@ func List(ctx context.Context, options ListOptions) (stickersearch.Result, error
 			items = append(items, favorite)
 			if options.Collection != "" {
 				memberPositions[favorite.ID] = member
+			} else if _, ok := memberPositions[favorite.ID]; !ok {
+				memberPositions[favorite.ID] = members[favorite.ID]
+				if _, ok := members[favorite.ID]; !ok {
+					memberPositions[favorite.ID] = CollectionItem{ID: favorite.ID, Position: manifestPositions[favorite.ID]}
+				}
 			}
 		}
-		if options.Collection != "" {
-			sort.SliceStable(items, func(i, j int) bool {
-				left, right := memberPositions[items[i].ID], memberPositions[items[j].ID]
-				if options.Sort == "added" && left.AddedAt != right.AddedAt {
-					return left.AddedAt < right.AddedAt
-				}
-				if options.Sort == "manual" && left.Position != right.Position {
-					return left.Position < right.Position
-				}
-				if options.Sort == "caption" {
-					leftCaption := strings.ToLower(items[i].Caption)
-					rightCaption := strings.ToLower(items[j].Caption)
-					if leftCaption != rightCaption {
-						return leftCaption < rightCaption
-					}
-				}
-				return items[i].MD5 < items[j].MD5
-			})
-		} else {
-			sortFavoriteItems(items, options.Sort)
-		}
+		sortCollectionItems(items, memberPositions, manifestPositions, options.Sort)
 		result = pageFavorites(items, options.Limit, options.Offset)
 		return nil
 	})
@@ -114,6 +109,81 @@ func List(ctx context.Context, options ListOptions) (stickersearch.Result, error
 	return result, nil
 }
 
+func sortCollectionItems(items []stickersearch.Item, members map[string]CollectionItem, manifestPositions map[string]int, order string) {
+	sort.SliceStable(items, func(i, j int) bool {
+		left, right := members[items[i].ID], members[items[j].ID]
+		switch order {
+		case "manual":
+			if left.Position != right.Position {
+				return left.Position < right.Position
+			}
+		case "added":
+			if comparison := compareAddedAt(left, right, manifestPositions[items[i].ID], manifestPositions[items[j].ID]); comparison != 0 {
+				return comparison < 0
+			}
+		case "caption":
+			leftCaption := strings.ToLower(items[i].Caption)
+			rightCaption := strings.ToLower(items[j].Caption)
+			if leftCaption != rightCaption {
+				return leftCaption < rightCaption
+			}
+		case "md5":
+			return items[i].MD5 < items[j].MD5
+		}
+		return items[i].MD5 < items[j].MD5
+	})
+}
+
+func compareAddedAt(left, right CollectionItem, leftManifestPosition, rightManifestPosition int) int {
+	if left.AddedAt == "" || right.AddedAt == "" {
+		switch {
+		case left.AddedAt == "" && right.AddedAt == "":
+			return compareInts(leftManifestPosition, rightManifestPosition)
+		case left.AddedAt == "":
+			// Entries from older metadata have no timestamp. Keep them after
+			// timestamped entries while preserving their manifest order.
+			return 1
+		default:
+			return -1
+		}
+	}
+	leftTime, leftErr := time.Parse(time.RFC3339Nano, left.AddedAt)
+	rightTime, rightErr := time.Parse(time.RFC3339Nano, right.AddedAt)
+	if leftErr == nil && rightErr == nil {
+		switch {
+		case leftTime.Before(rightTime):
+			return -1
+		case leftTime.After(rightTime):
+			return 1
+		default:
+			return 0
+		}
+	}
+	return compareStrings(left.AddedAt, right.AddedAt)
+}
+
+func compareInts(left, right int) int {
+	switch {
+	case left < right:
+		return -1
+	case left > right:
+		return 1
+	default:
+		return 0
+	}
+}
+
+func compareStrings(left, right string) int {
+	switch {
+	case left < right:
+		return -1
+	case left > right:
+		return 1
+	default:
+		return 0
+	}
+}
+
 func pageFavorites(items []stickersearch.Item, limit, offset int) stickersearch.Result {
 	result := stickersearch.Result{Items: []stickersearch.Item{}, Total: len(items), NextOffset: offset}
 	if offset >= len(items) {
@@ -124,23 +194,6 @@ func pageFavorites(items []stickersearch.Item, limit, offset int) stickersearch.
 	result.NextOffset = end
 	result.HasMore = end < len(items)
 	return result
-}
-
-func sortFavoriteItems(items []stickersearch.Item, order string) {
-	if order == "manual" || order == "added" {
-		return
-	}
-	sort.SliceStable(items, func(i, j int) bool {
-		if order == "md5" {
-			return items[i].MD5 < items[j].MD5
-		}
-		left := strings.ToLower(items[i].Caption)
-		right := strings.ToLower(items[j].Caption)
-		if left != right {
-			return left < right
-		}
-		return items[i].MD5 < items[j].MD5
-	})
 }
 
 // DescribeOptions controls one personal caption update.
