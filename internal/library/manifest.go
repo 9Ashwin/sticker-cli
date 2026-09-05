@@ -256,20 +256,41 @@ func (l *Library) ReadItem(ctx context.Context, id string) (Item, string, error)
 	return Item{}, "", errorf("not_found", "item_not_found", "Choose an ID listed by the library.", "item %s was not found", id)
 }
 
-func (l *Library) verifyItem(ctx context.Context, item Item) error {
-	_, err := l.itemPath(item)
+// OpenVerified opens one standard item only after all declared integrity
+// checks have passed. The caller owns the returned file and must close it.
+// The file offset is reset to the beginning before returning.
+func (l *Library) OpenVerified(ctx context.Context, item Item) (*os.File, string, error) {
+	if err := ValidateManifest(Manifest{SchemaVersion: 1, Collection: "verify", Items: []Item{item}}, l.Limits); err != nil {
+		return nil, "", err
+	}
+	path, err := l.itemPath(item)
 	if err != nil {
-		return err
+		return nil, "", err
 	}
 	file, err := openRelativeNoFollow(l.Root, filepath.FromSlash(item.Filename))
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			return &Error{Kind: "integrity", Subtype: "invalid_image", Message: fmt.Sprintf("image %s is missing", item.MD5), Hint: "Restore the missing image or remove its manifest entry.", Err: os.ErrNotExist}
+			return nil, "", &Error{Kind: "integrity", Subtype: "invalid_image", Message: fmt.Sprintf("image %s is missing", item.MD5), Hint: "Restore the missing image or remove its manifest entry.", Err: os.ErrNotExist}
 		}
-		return wrapError("io", "read_failed", "Check the image permissions.", err)
+		return nil, "", wrapError("io", "read_failed", "Check the image permissions.", err)
 	}
-	defer func() { _ = file.Close() }()
-	return verifyFileHandle(ctx, file, item, l.Limits)
+	if err := verifyFileHandle(ctx, file, item, l.Limits); err != nil {
+		_ = file.Close()
+		return nil, "", err
+	}
+	if _, err := file.Seek(0, io.SeekStart); err != nil {
+		_ = file.Close()
+		return nil, "", wrapError("io", "read_failed", "Check the image file.", err)
+	}
+	return file, path, nil
+}
+
+func (l *Library) verifyItem(ctx context.Context, item Item) error {
+	file, _, err := l.OpenVerified(ctx, item)
+	if err != nil {
+		return err
+	}
+	return file.Close()
 }
 
 // VerifyItem validates one manifest item using the library root's secure
