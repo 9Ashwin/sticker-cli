@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"errors"
 
 	"github.com/9Ashwin/sticker-cli/internal/packs"
@@ -20,44 +21,77 @@ func runPackInstall(cmd *cobra.Command, options *rootOptions, args []string) err
 	if err != nil {
 		return err
 	}
-	if !dryRun {
-		result, err := packs.Install(cmd.Context(), packs.InstallOptions{
-			Home:   home,
-			Source: source,
-			PackID: args[0],
-		})
-		if err != nil {
-			return normalizePackError(err)
-		}
-		return writeResult(cmd, options, map[string]any{
-			"source":         result.Source,
-			"target":         result.Target,
-			"pack":           result.Pack,
-			"revision":       result.Revision,
-			"added":          result.Added,
-			"reused":         result.Reused,
-			"download_bytes": result.DownloadBytes,
-			"dry_run":        false,
-		}, false)
-	}
-	plan, err := packs.Plan(cmd.Context(), packs.PlanOptions{
-		Home:   home,
-		Source: source,
-		PackID: args[0],
-	})
+	data, err := executePackInstall(cmd.Context(), home, source, args[0], dryRun)
 	if err != nil {
 		return normalizePackError(err)
 	}
-	return writeResult(cmd, options, map[string]any{
-		"source":         plan.Source,
-		"target":         plan.Target,
-		"pack":           plan.Pack,
-		"revision":       plan.Revision,
-		"added":          plan.Added,
-		"reused":         plan.Reused,
-		"download_bytes": plan.DownloadBytes,
-		"dry_run":        true,
-	}, false)
+	return writeResult(cmd, options, data, false)
+}
+
+func runSetup(cmd *cobra.Command, options *rootOptions) error {
+	packID, err := cmd.Flags().GetString("pack")
+	if err != nil {
+		return err
+	}
+	source, err := cmd.Flags().GetString("source")
+	if err != nil {
+		return err
+	}
+	dryRun, err := cmd.Flags().GetBool("dry-run")
+	if err != nil {
+		return err
+	}
+	home, err := resolveHome(options)
+	if err != nil {
+		return err
+	}
+	data, err := executePackInstall(cmd.Context(), home, source, packID, dryRun)
+	if err != nil {
+		return normalizePackError(err)
+	}
+	data["setup"] = true
+	return writeResult(cmd, options, data, false)
+}
+
+func executePackInstall(ctx context.Context, home, source, packID string, dryRun bool) (map[string]any, error) {
+	if dryRun {
+		plan, err := packs.Plan(ctx, packs.PlanOptions{
+			Home:   home,
+			Source: source,
+			PackID: packID,
+		})
+		if err != nil {
+			return nil, err
+		}
+		return map[string]any{
+			"source":         plan.Source,
+			"target":         plan.Target,
+			"pack":           plan.Pack,
+			"revision":       plan.Revision,
+			"added":          plan.Added,
+			"reused":         plan.Reused,
+			"download_bytes": plan.DownloadBytes,
+			"dry_run":        true,
+		}, nil
+	}
+	result, err := packs.Install(ctx, packs.InstallOptions{
+		Home:   home,
+		Source: source,
+		PackID: packID,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return map[string]any{
+		"source":         result.Source,
+		"target":         result.Target,
+		"pack":           result.Pack,
+		"revision":       result.Revision,
+		"added":          result.Added,
+		"reused":         result.Reused,
+		"download_bytes": result.DownloadBytes,
+		"dry_run":        false,
+	}, nil
 }
 
 func runPackUpdate(cmd *cobra.Command, options *rootOptions, args []string) error {

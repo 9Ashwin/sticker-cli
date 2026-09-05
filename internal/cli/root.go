@@ -198,7 +198,7 @@ func registerCommands(root *cobra.Command, registry *commandRegistry, options *r
 		if err := validateSetup(cmd); err != nil {
 			return err
 		}
-		return placeholder(cmd, "setup")
+		return runSetup(cmd, options)
 	}
 	registry.register(root, setup.metadata)
 	root.AddCommand(setup.Command)
