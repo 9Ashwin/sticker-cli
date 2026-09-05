@@ -56,7 +56,7 @@ Windows 用户下载发布页的 `install.ps1` 后在 PowerShell 中运行：
 ./scripts/install-skill.sh /path/to/agent/skills/sticker
 ```
 
-用临时 home 和本地 fixture 验收完整 Agent 流程（不访问微信、MCP 或公网素材源）：
+CI 会在 Linux 和 macOS 上用无 CGO 的构建运行完整验收。测试每次创建临时 home 和本地 fixture，覆盖精选包选择、离线读取、WebP 预览、动图原图、标准 v1 导入、四种排序、批量整理、损坏状态和归档校验失败；不访问微信、MCP、账号凭据或公网素材源：
 
 ```bash
 make e2e-agent

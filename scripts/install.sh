@@ -55,7 +55,8 @@ version="v${version#v}"
 [[ "$version" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]] || fail "version must be a release version such as v1.2.3"
 
 asset="sticker_${os}_${arch}.tar.gz"
-base_url="https://github.com/${repo}/releases/download/${version}"
+base_url="${STICKER_RELEASE_BASE_URL:-https://github.com/${repo}/releases/download/${version}}"
+base_url="${base_url%/}"
 tmp=$(mktemp -d "${TMPDIR:-/tmp}/sticker-install.XXXXXX")
 trap 'rm -rf "$tmp"' EXIT
 
