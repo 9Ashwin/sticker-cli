@@ -1,9 +1,9 @@
 # emoticon-cli
 
-当前阶段是需求规划。先阅读 tasks/prd-emoticon-cli.md；其中的命令、故事和验收项是计划，不代表已实现。
+当前按 GitHub Issues 顺序实施。先阅读 tasks/prd-emoticon-cli.md 与 tasks/spec-emoticon-cli.md，以具体 Issue 的验收条件界定改动。
 
-用户已选择 Go，并要求参考 larksuite/cli 的实践。只借鉴适用于独立本地素材工具的部分，不复制飞书服务、账号或 API 架构。
+实现使用 Go + Cobra。代码、注释和面向用户的文档只描述本项目，不提及设计参考来源。每个 Issue 使用独立分支，验证和 review 后通过 PR 合并。
 
 素材属于独立仓库，禁止在本仓库提交原图全集、私人收藏、密钥和开发者本机数据。实现时保持默认 JSON、稳定错误、离线读取、选择性安装与私人收藏保留契约。
 
-PRD 确认后按用户指示推进 SPEC、Issues 或实现；不要将规划里的未来能力写成已交付功能。
+执行 make quality，并对并发和文件操作执行 go test -race ./...。不要将尚未实现或验证的能力写成已交付功能。
