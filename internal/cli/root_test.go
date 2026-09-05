@@ -301,6 +301,50 @@ func TestHiddenCompletionEndpointsAreRejected(t *testing.T) {
 	}
 }
 
+func TestHelpDoesNotBypassArgumentValidation(t *testing.T) {
+	for _, args := range [][]string{
+		{"packs", "nope", "--help"},
+		{"packs", "install", "--help", "extra"},
+		{"--format", "xml", "--help"},
+		{"--format", "table", "--json", "--help"},
+	} {
+		var out, errOut bytes.Buffer
+		if code := Run(context.Background(), args, &out, &errOut, "dev", "unknown"); code != 2 || out.Len() != 0 {
+			t.Fatalf("args %v: exit %d stdout %q stderr %q", args, code, out.String(), errOut.String())
+		}
+		assertError(t, errOut.Bytes(), "validation", "invalid_argument")
+	}
+}
+
+func TestGetSchemaDeclaresPreviewPath(t *testing.T) {
+	var out, errOut bytes.Buffer
+	if code := Run(context.Background(), []string{"schema", "get"}, &out, &errOut, "dev", "unknown"); code != 0 {
+		t.Fatalf("exit %d: %s", code, errOut.String())
+	}
+	var envelope struct {
+		Data struct {
+			ResultSchema struct {
+				Properties struct {
+					Item struct {
+						Properties map[string]struct {
+							Type string `json:"type"`
+						} `json:"properties"`
+					} `json:"item"`
+				} `json:"properties"`
+			} `json:"result_schema"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(out.Bytes(), &envelope); err != nil {
+		t.Fatal(err)
+	}
+	if got := envelope.Data.ResultSchema.Properties.Item.Properties["preview_path"].Type; got != "string" {
+		t.Fatalf("preview_path schema type = %q, want string: %s", got, out.String())
+	}
+	if errOut.Len() != 0 {
+		t.Fatalf("unexpected stderr: %s", errOut.String())
+	}
+}
+
 func TestFavoriteRemoveAcceptsMultipleIDs(t *testing.T) {
 	var out, errOut bytes.Buffer
 	ids := []string{"0123456789abcdef0123456789abcdef", "abcdef0123456789abcdef0123456789"}

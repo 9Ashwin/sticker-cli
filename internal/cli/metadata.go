@@ -36,6 +36,30 @@ func objectSchema(fields ...string) map[string]any {
 	return map[string]any{"type": "object", "properties": properties}
 }
 
+func getResultSchema() map[string]any {
+	return map[string]any{
+		"type": "object",
+		"properties": map[string]any{
+			"item": map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"id":           map[string]any{"type": "string"},
+					"md5":          map[string]any{"type": "string"},
+					"sha256":       map[string]any{"type": "string"},
+					"filename":     map[string]any{"type": "string"},
+					"format":       map[string]any{"type": "string"},
+					"size":         map[string]any{"type": "integer"},
+					"caption":      map[string]any{"type": "string"},
+					"path":         map[string]any{"type": "string"},
+					"favorite":     map[string]any{"type": "boolean"},
+					"packs":        map[string]any{"type": "array", "items": map[string]any{"type": "string"}},
+					"preview_path": map[string]any{"type": "string"},
+				},
+			},
+		},
+	}
+}
+
 func defaultErrors() []schemaError {
 	return []schemaError{
 		{Type: "validation", Subtype: "invalid_argument", ExitCode: 2},
@@ -181,7 +205,7 @@ func getMetadata() commandMetadata {
 		Effect:      effectRead,
 		Parameters:  []parameterMetadata{{Name: "id", Type: "string", Source: "argument", Description: "Complete lowercase MD5 item ID", Required: true}},
 		Flags:       []flagMetadata{{Name: "preview", Type: "bool", Default: false, Description: "Generate or reuse a PNG preview for a static WebP"}},
-		Result:      objectSchema("item", "object"),
+		Result:      getResultSchema(),
 		Errors:      defaultErrors(),
 		Examples:    []string{"sticker get 0123456789abcdef0123456789abcdef", "sticker get 0123456789abcdef0123456789abcdef --preview"},
 		Args:        cobra.ExactArgs(1),

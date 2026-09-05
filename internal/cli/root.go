@@ -24,6 +24,9 @@ func Run(ctx context.Context, args []string, out, errOut io.Writer, version, com
 	if isHiddenCompletionInvocation(args) {
 		return writeError(errOut, validationError("invalid_argument", "shell completion is not part of the CLI contract", "Use sticker help or sticker schema for command discovery."))
 	}
+	if err := validateHelpInvocation(root, args); err != nil {
+		return writeError(errOut, err)
+	}
 	if err := root.ExecuteContext(ctx); err != nil {
 		return writeError(errOut, normalizeError(ctx, err))
 	}
@@ -502,6 +505,151 @@ func isHiddenCompletionInvocation(args []string) bool {
 		}
 	}
 	return false
+}
+
+func validateHelpInvocation(root *cobra.Command, args []string) error {
+	helpIndex := -1
+	for index, argument := range args {
+		if argument == "--" {
+			break
+		}
+		if argument == "--help" || argument == "-h" || strings.HasPrefix(argument, "--help=") {
+			helpIndex = index
+			break
+		}
+	}
+	if helpIndex < 0 {
+		return nil
+	}
+	if helpIndex+1 < len(args) {
+		return validationError("invalid_argument", "arguments are not allowed after --help", "Place --help after the complete command and its arguments.")
+	}
+	options, err := helpOptions(args[:helpIndex])
+	if err != nil {
+		return err
+	}
+	if err := validateInvocation(nil, options); err != nil {
+		return err
+	}
+
+	command, positionals, err := commandAndPositionals(root, args[:helpIndex])
+	if err != nil {
+		return err
+	}
+	if !helpAllowsPositionals(command, len(positionals)) {
+		return validationError("invalid_argument", "too many arguments for "+command.CommandPath(), "Check the command help for the supported arguments.")
+	}
+	return nil
+}
+
+func helpOptions(args []string) (*rootOptions, error) {
+	options := &rootOptions{format: formatJSON}
+	for index := 0; index < len(args); index++ {
+		argument := args[index]
+		switch {
+		case argument == "--json":
+			options.json = true
+		case argument == "--format":
+			if index+1 >= len(args) {
+				return nil, validationError("invalid_argument", "flag requires a value: --format", "Provide json or table before --help.")
+			}
+			options.format = args[index+1]
+			index++
+		case strings.HasPrefix(argument, "--format="):
+			options.format = strings.TrimPrefix(argument, "--format=")
+		case argument == "--home":
+			if index+1 >= len(args) {
+				return nil, validationError("invalid_argument", "flag requires a value: --home", "Provide a data directory before --help.")
+			}
+			index++
+		}
+	}
+	return options, nil
+}
+
+func commandAndPositionals(root *cobra.Command, args []string) (*cobra.Command, []string, error) {
+	command := root
+	positionals := make([]string, 0)
+	for index := 0; index < len(args); index++ {
+		argument := args[index]
+		if argument == "--" {
+			positionals = append(positionals, args[index+1:]...)
+			break
+		}
+		if strings.HasPrefix(argument, "-") {
+			if argument == "-h" {
+				continue
+			}
+			name, inline := splitLongFlag(argument)
+			if name == "" {
+				return nil, nil, validationError("invalid_argument", "unsupported flag before --help: "+argument, "Check the command help for supported flags.")
+			}
+			takesValue, known := flagValueRequirement(command, name)
+			if !known {
+				return nil, nil, validationError("invalid_argument", "unknown flag: "+name, "Check the command help for supported flags.")
+			}
+			if takesValue && !inline {
+				if index+1 >= len(args) {
+					return nil, nil, validationError("invalid_argument", "flag requires a value: "+name, "Provide a value before --help.")
+				}
+				index++
+			}
+			continue
+		}
+		if len(positionals) == 0 {
+			for _, child := range command.Commands() {
+				if child.Name() == argument && !child.Hidden {
+					command = child
+					goto nextArgument
+				}
+			}
+		}
+		positionals = append(positionals, argument)
+	nextArgument:
+	}
+	return command, positionals, nil
+}
+
+func splitLongFlag(argument string) (string, bool) {
+	if !strings.HasPrefix(argument, "--") {
+		return "", false
+	}
+	name := strings.TrimPrefix(argument, "--")
+	if name == "" {
+		return "", false
+	}
+	if separator := strings.IndexByte(name, '='); separator >= 0 {
+		return "--" + name[:separator], true
+	}
+	return "--" + name, false
+}
+
+func flagValueRequirement(command *cobra.Command, name string) (takesValue, known bool) {
+	flag := command.Flags().Lookup(strings.TrimPrefix(name, "--"))
+	if flag == nil {
+		flag = command.InheritedFlags().Lookup(strings.TrimPrefix(name, "--"))
+	}
+	if flag == nil {
+		flag = command.Root().PersistentFlags().Lookup(strings.TrimPrefix(name, "--"))
+	}
+	if flag == nil {
+		return false, false
+	}
+	return flag.NoOptDefVal == "", true
+}
+
+func helpAllowsPositionals(command *cobra.Command, count int) bool {
+	parts := strings.Fields(command.Use)
+	if len(parts) <= 1 {
+		return count == 0
+	}
+	maximum := len(parts) - 1
+	for _, part := range parts[1:] {
+		if strings.HasSuffix(part, "...") {
+			return true
+		}
+	}
+	return count <= maximum
 }
 
 func findCommand(root *cobra.Command, args []string) *cobra.Command {
