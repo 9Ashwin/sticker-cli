@@ -8,6 +8,7 @@ import (
 	"io"
 	"strings"
 
+	"github.com/9Ashwin/sticker-cli/internal/library"
 	"github.com/spf13/cobra"
 )
 
@@ -173,11 +174,11 @@ func registerCommands(root *cobra.Command, registry *commandRegistry, options *r
 	})
 
 	search := newCommand(searchMetadata())
-	search.Command.RunE = func(cmd *cobra.Command, _ []string) error {
+	search.Command.RunE = func(cmd *cobra.Command, args []string) error {
 		if err := validateSearch(cmd); err != nil {
 			return err
 		}
-		return placeholder(cmd, "search")
+		return runSearch(cmd.Context(), cmd, options, args)
 	}
 	registry.register(root, search.metadata)
 	root.AddCommand(search.Command)
@@ -738,7 +739,39 @@ func normalizeError(ctx context.Context, err error) error {
 	if isArgumentError(err) {
 		return validationError("invalid_argument", err.Error(), "Check the command help for required arguments and flags.")
 	}
+	var libraryErr *library.Error
+	if errors.As(err, &libraryErr) {
+		return &cliError{
+			Type:      libraryErr.Kind,
+			Subtype:   libraryErr.Subtype,
+			Message:   libraryErr.Message,
+			Hint:      libraryErr.Hint,
+			ExitCode:  libraryErrorExitCode(libraryErr.Kind),
+			Retryable: libraryErr.Retryable,
+		}
+	}
 	return err
+}
+
+func libraryErrorExitCode(kind string) int {
+	switch kind {
+	case "validation":
+		return 2
+	case "not_found":
+		return 3
+	case "network":
+		return 4
+	case "integrity":
+		return 5
+	case "conflict":
+		return 6
+	case "io":
+		return 7
+	case "cancelled":
+		return 130
+	default:
+		return 1
+	}
 }
 
 func isArgumentError(err error) bool {
