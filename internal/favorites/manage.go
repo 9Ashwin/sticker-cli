@@ -45,44 +45,85 @@ func List(ctx context.Context, options ListOptions) (stickersearch.Result, error
 	default:
 		return stickersearch.Result{}, errorf("validation", "invalid_argument", "Choose manual, added, caption, or md5 ordering.", "unsupported favorite sort %q", options.Sort)
 	}
-	if options.Collection != "" && options.Collection != "favorites" {
-		return stickersearch.Result{}, errorf("not_found", "collection_not_found", "Use the default favorites collection until custom collections are configured.", "favorite collection %q was not found", options.Collection)
-	}
-
 	root, err := library.New(options.Home)
 	if err != nil {
 		return stickersearch.Result{}, err
 	}
-	manifest, err := root.ReadManifest(ctx)
+	var result stickersearch.Result
+	err = root.WithReadLock(ctx, func(manifest library.Manifest) error {
+		state, err := readCollections(ctx, root, manifest)
+		if err != nil {
+			return err
+		}
+		members := map[string]CollectionItem{}
+		memberPositions := map[string]CollectionItem{}
+		if options.Collection != "" {
+			collection, ok := findCollection(state, options.Collection)
+			if !ok {
+				return collectionNotFound(options.Collection)
+			}
+			for _, member := range collection.Items {
+				members[member.ID] = member
+			}
+		}
+		items := make([]stickersearch.Item, 0, len(manifest.Items))
+		for _, item := range manifest.Items {
+			member, selected := members[item.MD5]
+			if options.Collection != "" && !selected {
+				continue
+			}
+			favorite, err := favoriteItem(root, item)
+			if err != nil {
+				return err
+			}
+			items = append(items, favorite)
+			if options.Collection != "" {
+				memberPositions[favorite.ID] = member
+			}
+		}
+		if options.Collection != "" {
+			sort.SliceStable(items, func(i, j int) bool {
+				left, right := memberPositions[items[i].ID], memberPositions[items[j].ID]
+				if options.Sort == "added" && left.AddedAt != right.AddedAt {
+					return left.AddedAt < right.AddedAt
+				}
+				if options.Sort == "manual" && left.Position != right.Position {
+					return left.Position < right.Position
+				}
+				if options.Sort == "caption" {
+					leftCaption := strings.ToLower(items[i].Caption)
+					rightCaption := strings.ToLower(items[j].Caption)
+					if leftCaption != rightCaption {
+						return leftCaption < rightCaption
+					}
+				}
+				return items[i].MD5 < items[j].MD5
+			})
+		} else {
+			sortFavoriteItems(items, options.Sort)
+		}
+		result = pageFavorites(items, options.Limit, options.Offset)
+		return nil
+	})
 	if err != nil {
 		return stickersearch.Result{}, err
-	}
-	items := make([]stickersearch.Item, 0, len(manifest.Items))
-	for _, item := range manifest.Items {
-		favorite, err := favoriteItem(root, item)
-		if err != nil {
-			return stickersearch.Result{}, err
-		}
-		items = append(items, favorite)
-	}
-	sortFavoriteItems(items, options.Sort)
-
-	result := stickersearch.Result{
-		Items:      []stickersearch.Item{},
-		Total:      len(items),
-		NextOffset: options.Offset,
-		HasMore:    false,
-	}
-	if options.Offset < len(items) {
-		end := min(options.Offset+options.Limit, len(items))
-		result.Items = append(result.Items, items[options.Offset:end]...)
-		result.NextOffset = end
-		result.HasMore = end < len(items)
 	}
 	if err := contextError(ctx); err != nil {
 		return stickersearch.Result{}, err
 	}
 	return result, nil
+}
+
+func pageFavorites(items []stickersearch.Item, limit, offset int) stickersearch.Result {
+	result := stickersearch.Result{Items: []stickersearch.Item{}, Total: len(items), NextOffset: offset}
+	if offset >= len(items) {
+		return result
+	}
+	end := min(offset+limit, len(items))
+	result.Items = append(result.Items, items[offset:end]...)
+	result.NextOffset = end
+	result.HasMore = end < len(items)
+	return result
 }
 
 func sortFavoriteItems(items []stickersearch.Item, order string) {
@@ -192,7 +233,8 @@ type RemoveResult struct {
 	DryRun           bool `json:"dry_run,omitempty"`
 }
 
-// Remove deletes only personal manifest entries. It never deletes image
+// Remove deletes personal manifest entries and removes their collection
+// relationships while holding one library write lock. It never deletes image
 // files, allowing installed packs and other references to continue using the
 // same original bytes.
 func Remove(ctx context.Context, options RemoveOptions) (RemoveResult, error) {
@@ -227,7 +269,7 @@ func Remove(ctx context.Context, options RemoveOptions) (RemoveResult, error) {
 	}
 
 	var committed int
-	if err := root.UpdateManifest(ctx, func(current library.Manifest) (library.Manifest, error) {
+	if err := root.WithWriteLock(ctx, func(current library.Manifest) error {
 		kept := make([]library.Item, 0, len(current.Items))
 		for _, item := range current.Items {
 			if _, remove := ids[item.MD5]; remove {
@@ -236,8 +278,32 @@ func Remove(ctx context.Context, options RemoveOptions) (RemoveResult, error) {
 			}
 			kept = append(kept, item)
 		}
-		current.Items = kept
-		return current, nil
+		next := current
+		next.Items = kept
+		if committed == 0 {
+			return nil
+		}
+		state, err := readCollections(ctx, root, current)
+		if err != nil {
+			return err
+		}
+		for index := range state.Collections {
+			items := state.Collections[index].Items[:0]
+			for _, item := range state.Collections[index].Items {
+				if _, remove := ids[item.ID]; !remove {
+					items = append(items, item)
+				}
+			}
+			state.Collections[index].Items = items
+		}
+		normalizeCollections(&state)
+		if err := writeCollections(ctx, root, state, next); err != nil {
+			return err
+		}
+		if err := root.WriteManifestLocked(ctx, next); err != nil {
+			return err
+		}
+		return nil
 	}); err != nil {
 		return RemoveResult{}, err
 	}

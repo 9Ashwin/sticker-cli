@@ -148,6 +148,41 @@ func TestRemoveIsIdempotentAndRetainsOriginal(t *testing.T) {
 	}
 }
 
+func TestRemoveClearsCollectionMembership(t *testing.T) {
+	home := filepath.Join(t.TempDir(), "home")
+	item := addTestFavorite(t, home, "remove-from-collection", "playful scene")
+	if _, err := CreateCollection(context.Background(), CollectionCreateOptions{Home: home, Name: "work"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Organize(context.Background(), OrganizeOptions{
+		Home:       home,
+		Collection: DefaultCollectionID,
+		IDs:        []string{item.MD5},
+		MoveTo:     "work",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Remove(context.Background(), RemoveOptions{Home: home, IDs: []string{item.MD5}}); err != nil {
+		t.Fatal(err)
+	}
+	collections, err := ListCollections(context.Background(), CollectionListOptions{Home: home})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, collection := range collections.Collections {
+		if len(collection.Items) != 0 {
+			t.Fatalf("removed item remains in collection %q: %+v", collection.ID, collection.Items)
+		}
+	}
+	filtered, err := List(context.Background(), ListOptions{Home: home, Collection: "work", Limit: 10})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if filtered.Total != 0 || len(filtered.Items) != 0 {
+		t.Fatalf("removed item remains in filtered favorites: %+v", filtered)
+	}
+}
+
 func TestConcurrentDescribeUpdatesKeepBothCaptions(t *testing.T) {
 	home := filepath.Join(t.TempDir(), "home")
 	first := addTestFavorite(t, home, "first", "one")

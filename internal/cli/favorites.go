@@ -168,3 +168,102 @@ func runFavoriteExport(ctx context.Context, cmd *cobra.Command, options *rootOpt
 	}
 	return writeResult(cmd, options, result, false)
 }
+
+func runFavoriteCollectionsList(ctx context.Context, cmd *cobra.Command, options *rootOptions) error {
+	home, err := resolveHome(options)
+	if err != nil {
+		return err
+	}
+	result, err := stickerfavorites.ListCollections(ctx, stickerfavorites.CollectionListOptions{Home: home})
+	if err != nil {
+		return err
+	}
+	return writeResult(cmd, options, result, false)
+}
+
+func runFavoriteCollectionsCreate(ctx context.Context, cmd *cobra.Command, options *rootOptions, name string) error {
+	home, err := resolveHome(options)
+	if err != nil {
+		return err
+	}
+	dryRun, err := cmd.Flags().GetBool("dry-run")
+	if err != nil {
+		return err
+	}
+	result, err := stickerfavorites.CreateCollection(ctx, stickerfavorites.CollectionCreateOptions{Home: home, Name: name, DryRun: dryRun})
+	if err != nil {
+		return err
+	}
+	return writeResult(cmd, options, result, false)
+}
+
+func runFavoriteCollectionsRename(ctx context.Context, cmd *cobra.Command, options *rootOptions, args []string) error {
+	home, err := resolveHome(options)
+	if err != nil {
+		return err
+	}
+	dryRun, err := cmd.Flags().GetBool("dry-run")
+	if err != nil {
+		return err
+	}
+	result, err := stickerfavorites.RenameCollection(ctx, stickerfavorites.CollectionRenameOptions{Home: home, ID: args[0], Name: args[1], DryRun: dryRun})
+	if err != nil {
+		return err
+	}
+	return writeResult(cmd, options, result, false)
+}
+
+func runFavoriteCollectionsRemove(ctx context.Context, cmd *cobra.Command, options *rootOptions, id string) error {
+	home, err := resolveHome(options)
+	if err != nil {
+		return err
+	}
+	dryRun, err := cmd.Flags().GetBool("dry-run")
+	if err != nil {
+		return err
+	}
+	result, err := stickerfavorites.RemoveCollection(ctx, stickerfavorites.CollectionRemoveOptions{Home: home, ID: id, DryRun: dryRun})
+	if err != nil {
+		return err
+	}
+	return writeResult(cmd, options, result, false)
+}
+
+func runFavoriteOrganize(ctx context.Context, cmd *cobra.Command, options *rootOptions) error {
+	home, err := resolveHome(options)
+	if err != nil {
+		return err
+	}
+	collection, err := cmd.Flags().GetString("collection")
+	if err != nil {
+		return err
+	}
+	ids, err := cmd.Flags().GetStringSlice("ids")
+	if err != nil {
+		return err
+	}
+	moveTo, err := cmd.Flags().GetString("move-to")
+	if err != nil {
+		return err
+	}
+	order, err := cmd.Flags().GetStringSlice("order")
+	if err != nil {
+		return err
+	}
+	dryRun, err := cmd.Flags().GetBool("dry-run")
+	if err != nil {
+		return err
+	}
+	result, err := stickerfavorites.Organize(ctx, stickerfavorites.OrganizeOptions{
+		Home:       home,
+		Collection: collection,
+		IDs:        ids,
+		MoveTo:     moveTo,
+		Order:      order,
+		DryRun:     dryRun,
+	})
+	if err != nil {
+		return err
+	}
+	return writeResult(cmd, options, result, false)
+}

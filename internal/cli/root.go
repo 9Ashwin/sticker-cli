@@ -228,13 +228,13 @@ func registerCommands(root *cobra.Command, registry *commandRegistry, options *r
 	favorites.Command.AddCommand(collections.Command)
 
 	addFavoriteCommand(collections.Command, registry, favoriteCollectionsListMetadata(), func(cmd *cobra.Command, _ []string) error {
-		return placeholder(cmd, "favorites collections list")
+		return runFavoriteCollectionsList(cmd.Context(), cmd, options)
 	})
 	addFavoriteCommand(collections.Command, registry, favoriteCollectionsCreateMetadata(), func(cmd *cobra.Command, args []string) error {
 		if err := validateCollectionName(args[0]); err != nil {
 			return err
 		}
-		return placeholder(cmd, "favorites collections create")
+		return runFavoriteCollectionsCreate(cmd.Context(), cmd, options, args[0])
 	})
 	addFavoriteCommand(collections.Command, registry, favoriteCollectionsRenameMetadata(), func(cmd *cobra.Command, args []string) error {
 		if err := validateCollectionID(args[0]); err != nil {
@@ -243,13 +243,13 @@ func registerCommands(root *cobra.Command, registry *commandRegistry, options *r
 		if err := validateCollectionName(args[1]); err != nil {
 			return err
 		}
-		return placeholder(cmd, "favorites collections rename")
+		return runFavoriteCollectionsRename(cmd.Context(), cmd, options, args)
 	})
 	addFavoriteCommand(collections.Command, registry, favoriteCollectionsRemoveMetadata(), func(cmd *cobra.Command, args []string) error {
 		if err := validateCollectionID(args[0]); err != nil {
 			return err
 		}
-		return placeholder(cmd, "favorites collections remove")
+		return runFavoriteCollectionsRemove(cmd.Context(), cmd, options, args[0])
 	})
 
 	organize := newCommand(favoriteOrganizeMetadata())
@@ -257,7 +257,7 @@ func registerCommands(root *cobra.Command, registry *commandRegistry, options *r
 		if err := validateOrganize(cmd); err != nil {
 			return err
 		}
-		return placeholder(cmd, "favorites organize")
+		return runFavoriteOrganize(cmd.Context(), cmd, options)
 	}
 	registry.register(root, organize.metadata)
 	favorites.Command.AddCommand(organize.Command)
@@ -713,17 +713,6 @@ func structuredHelp(command *cobra.Command, options *rootOptions) error {
 		return err
 	}
 	return writeResult(command, options, map[string]string{"help": helpText}, false)
-}
-
-func placeholder(_ *cobra.Command, path string) error {
-	return &cliError{
-		Type:      "internal",
-		Subtype:   "unimplemented",
-		Message:   path + " is not implemented yet",
-		Hint:      "Use schema or --help to inspect the command contract.",
-		ExitCode:  1,
-		Retryable: false,
-	}
 }
 
 func normalizeError(ctx context.Context, err error) error {

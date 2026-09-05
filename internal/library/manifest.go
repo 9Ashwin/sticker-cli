@@ -225,6 +225,14 @@ func (l *Library) WithWriteLock(ctx context.Context, fn func(Manifest) error) er
 	return fn(manifest)
 }
 
+// WriteManifestLocked validates and atomically publishes a manifest while the
+// caller holds the lock acquired by WithWriteLock. It is intended for updates
+// that publish the manifest together with related private metadata under one
+// lock; callers must not invoke it outside that callback.
+func (l *Library) WriteManifestLocked(ctx context.Context, manifest Manifest) error {
+	return l.writeManifestUnlocked(ctx, manifest)
+}
+
 func (l *Library) readManifestUnlocked(ctx context.Context, required bool) (Manifest, error) {
 	path, err := l.rootPath(ManifestName)
 	if err != nil {
