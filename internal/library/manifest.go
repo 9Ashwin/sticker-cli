@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -263,13 +264,17 @@ func (l *Library) verifyItem(ctx context.Context, item Item) error {
 	file, err := openRelativeNoFollow(l.Root, filepath.FromSlash(item.Filename))
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			return errorf("integrity", "invalid_image", "Restore the missing image or remove its manifest entry.", "image %s is missing", item.MD5)
+			return &Error{Kind: "integrity", Subtype: "invalid_image", Message: fmt.Sprintf("image %s is missing", item.MD5), Hint: "Restore the missing image or remove its manifest entry.", Err: os.ErrNotExist}
 		}
 		return wrapError("io", "read_failed", "Check the image permissions.", err)
 	}
 	defer func() { _ = file.Close() }()
 	return verifyFileHandle(ctx, file, item, l.Limits)
 }
+
+// VerifyItem validates one manifest item using the library root's secure
+// relative-open implementation.
+func (l *Library) VerifyItem(ctx context.Context, item Item) error { return l.verifyItem(ctx, item) }
 
 // VerifyFile validates one standard manifest item at an already resolved path.
 // The caller remains responsible for resolving that path beneath its source root.

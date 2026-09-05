@@ -136,7 +136,7 @@ func packInstallMetadata() commandMetadata {
 			{Name: "source", Type: "string", Description: "Pack directory or HTTPS source"},
 			{Name: "dry-run", Type: "bool", Default: false, Description: "Show the plan without downloading or writing"},
 		},
-		Result:   objectSchema("pack", "object", "revision", "string", "added", "int", "reused", "int", "download_bytes", "int"),
+		Result:   objectSchema("source", "string", "target", "string", "pack", "object", "revision", "string", "added", "int", "reused", "int", "download_bytes", "int", "dry_run", "bool"),
 		Errors:   defaultErrors(),
 		Examples: []string{"sticker packs install curated", "sticker packs install all --dry-run"},
 		Args:     cobra.ExactArgs(1),
