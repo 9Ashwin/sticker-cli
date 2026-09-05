@@ -136,6 +136,44 @@ type cacheRecord struct {
 }
 
 func fetchCatalog(ctx context.Context, source Source, options Options) ([]Pack, error) {
+	descriptors, err := fetchDirectory(ctx, source, options)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]Pack, 0, len(descriptors))
+	for _, descriptor := range descriptors {
+		manifestBytes, err := readManifest(ctx, source, descriptor.Manifest, options)
+		if err != nil {
+			return nil, err
+		}
+		if err := validateManifestBytes(manifestBytes, descriptor); err != nil {
+			return nil, err
+		}
+		result = append(result, Pack{
+			ID:          descriptor.ID,
+			Name:        descriptor.Name,
+			Description: descriptor.Description,
+			Revision:    descriptor.ManifestSHA256,
+			Count:       descriptor.Count,
+			Size:        descriptor.Size,
+		})
+	}
+	sort.Slice(result, func(i, j int) bool { return result[i].ID < result[j].ID })
+	return result, nil
+}
+
+// packSnapshot is one validated pack descriptor and its raw v1 manifest.
+// Keeping the raw bytes is important because the descriptor revision is the
+// SHA-256 of the bytes published by the source, rather than a re-encoded JSON
+// representation.
+type packSnapshot struct {
+	descriptor    entry
+	pack          Pack
+	manifest      library.Manifest
+	manifestBytes []byte
+}
+
+func fetchDirectory(ctx context.Context, source Source, options Options) ([]entry, error) {
 	var directoryBytes []byte
 	var err error
 	if source.IsLocal() {
@@ -155,29 +193,42 @@ func fetchCatalog(ctx context.Context, source Source, options Options) ([]Pack, 
 		return nil, invalidCollection("packs.json must declare schema_version 1 and a packs array")
 	}
 	seen := make(map[string]struct{}, len(directory.Packs))
-	result := make([]Pack, 0, len(directory.Packs))
 	for _, descriptor := range directory.Packs {
 		if err := validateEntry(descriptor, seen); err != nil {
 			return nil, err
 		}
+	}
+	return directory.Packs, nil
+}
+
+func fetchPackSnapshot(ctx context.Context, source Source, options Options, id string) (packSnapshot, error) {
+	descriptors, err := fetchDirectory(ctx, source, options)
+	if err != nil {
+		return packSnapshot{}, err
+	}
+	for _, descriptor := range descriptors {
+		if descriptor.ID != id {
+			continue
+		}
 		manifestBytes, err := readManifest(ctx, source, descriptor.Manifest, options)
 		if err != nil {
-			return nil, err
+			return packSnapshot{}, err
 		}
 		if err := validateManifestBytes(manifestBytes, descriptor); err != nil {
-			return nil, err
+			return packSnapshot{}, err
 		}
-		result = append(result, Pack{
-			ID:          descriptor.ID,
-			Name:        descriptor.Name,
-			Description: descriptor.Description,
-			Revision:    descriptor.ManifestSHA256,
-			Count:       descriptor.Count,
-			Size:        descriptor.Size,
-		})
+		manifest, err := decodeManifest(manifestBytes)
+		if err != nil {
+			return packSnapshot{}, newError("integrity", "invalid_manifest", fmt.Sprintf("manifest for pack %q is invalid: %v", id, err), "Repair the source manifest.")
+		}
+		return packSnapshot{
+			descriptor:    descriptor,
+			pack:          Pack{ID: descriptor.ID, Name: descriptor.Name, Description: descriptor.Description, Revision: descriptor.ManifestSHA256, Count: descriptor.Count, Size: descriptor.Size},
+			manifest:      manifest,
+			manifestBytes: append([]byte(nil), manifestBytes...),
+		}, nil
 	}
-	sort.Slice(result, func(i, j int) bool { return result[i].ID < result[j].ID })
-	return result, nil
+	return packSnapshot{}, newError("not_found", "pack_not_found", fmt.Sprintf("pack %s was not found in the source", id), "Run packs list to see available pack IDs.")
 }
 
 func validateEntry(value entry, seen map[string]struct{}) error {
