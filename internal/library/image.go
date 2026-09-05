@@ -39,16 +39,18 @@ func ReadImage(ctx context.Context, path string) (Item, []byte, error) {
 	if !info.Mode().IsRegular() {
 		return Item{}, nil, errorf("validation", "unsafe_path", "Provide a regular image file.", "source image is not a regular file")
 	}
-
-	file, err := openNoFollow(absolute)
+	file, err := openSourceNoFollow(absolute)
 	if err != nil {
-		var coded *Error
-		if errors.As(err, &coded) {
-			return Item{}, nil, err
-		}
-		return Item{}, nil, wrapError("io", "read_failed", "Check the source image permissions.", err)
+		return Item{}, nil, sourcePathError(err)
 	}
 	defer func() { _ = file.Close() }()
+	info, err = file.Stat()
+	if err != nil {
+		return Item{}, nil, wrapError("io", "read_failed", "Check the source image.", err)
+	}
+	if !info.Mode().IsRegular() {
+		return Item{}, nil, errorf("validation", "unsafe_path", "Provide a regular image file.", "source image is not a regular file")
+	}
 
 	data, err := readImageBytes(ctx, file)
 	if err != nil {
