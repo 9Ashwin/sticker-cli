@@ -1,11 +1,13 @@
 package favorites
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/9Ashwin/sticker-cli/internal/library"
@@ -182,6 +184,85 @@ func TestCorruptCollectionsMetadataDoesNotHideManifest(t *testing.T) {
 	manifest, err := root.ReadManifest(context.Background())
 	if err != nil || len(manifest.Items) != 1 || manifest.Items[0].MD5 != item.MD5 {
 		t.Fatalf("manifest became unreadable after metadata corruption: %+v %v", manifest, err)
+	}
+}
+
+func TestOrganizeBatchIsAtomicAndDryRunDoesNotWrite(t *testing.T) {
+	home := filepath.Join(t.TempDir(), "home")
+	first := addTestFavorite(t, home, "batch-first", "first")
+	second := addTestFavorite(t, home, "batch-second", "second")
+	third := addTestFavorite(t, home, "batch-third", "third")
+	if _, err := CreateCollection(context.Background(), CollectionCreateOptions{Home: home, Name: "work"}); err != nil {
+		t.Fatal(err)
+	}
+	metadataPath := filepath.Join(home, CollectionsRelativePath)
+	before, err := os.ReadFile(metadataPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dryRun, err := Organize(context.Background(), OrganizeOptions{
+		Home: home, Collection: DefaultCollectionID, IDs: []string{first.MD5, second.MD5}, MoveTo: "work", DryRun: true,
+	})
+	if err != nil || dryRun.Moved != 2 || dryRun.Removed != 2 || dryRun.Committed || !dryRun.DryRun {
+		t.Fatalf("unexpected batch dry-run: %+v %v", dryRun, err)
+	}
+	afterDryRun, err := os.ReadFile(metadataPath)
+	if err != nil || !bytes.Equal(before, afterDryRun) {
+		t.Fatalf("batch dry-run changed metadata: %v", err)
+	}
+
+	committed, err := Organize(context.Background(), OrganizeOptions{
+		Home: home, Collection: DefaultCollectionID, IDs: []string{first.MD5, second.MD5}, MoveTo: "work",
+	})
+	if err != nil || committed.Moved != 2 || committed.Removed != 2 || !committed.Committed {
+		t.Fatalf("unexpected batch move: %+v %v", committed, err)
+	}
+	work, err := List(context.Background(), ListOptions{Home: home, Collection: "work", Sort: "manual", Limit: 10})
+	if err != nil || work.Total != 2 || work.Items[0].ID != first.MD5 || work.Items[1].ID != second.MD5 {
+		t.Fatalf("unexpected moved collection: %+v %v", work, err)
+	}
+	reordered, err := Organize(context.Background(), OrganizeOptions{
+		Home: home, Collection: "work", Order: []string{second.MD5, first.MD5},
+	})
+	if err != nil || !reordered.Reordered || !reordered.Committed {
+		t.Fatalf("unexpected batch reorder: %+v %v", reordered, err)
+	}
+	work, err = List(context.Background(), ListOptions{Home: home, Collection: "work", Sort: "manual", Limit: 10})
+	if err != nil || work.Items[0].ID != second.MD5 || work.Items[1].ID != first.MD5 {
+		t.Fatalf("unexpected reordered collection: %+v %v", work, err)
+	}
+
+	unchanged, err := os.ReadFile(metadataPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	unknownID := strings.Repeat("0", 32)
+	if _, err := Organize(context.Background(), OrganizeOptions{
+		Home: home, Collection: "work", IDs: []string{second.MD5, unknownID}, MoveTo: DefaultCollectionID,
+	}); !isLibraryError(err, "not_found", "item_not_found") {
+		t.Fatalf("unknown batch ID error = %v", err)
+	}
+	if current, readErr := os.ReadFile(metadataPath); readErr != nil || !bytes.Equal(unchanged, current) {
+		t.Fatalf("unknown batch ID changed metadata: %v", readErr)
+	}
+	if _, err := Organize(context.Background(), OrganizeOptions{
+		Home: home, Collection: "work", Order: []string{second.MD5, second.MD5},
+	}); !isLibraryError(err, "integrity", "invalid_collection") {
+		t.Fatalf("duplicate order error = %v", err)
+	}
+	if _, err := Organize(context.Background(), OrganizeOptions{
+		Home: home, Collection: "work", IDs: []string{first.MD5, first.MD5},
+	}); !isLibraryError(err, "integrity", "invalid_collection") {
+		t.Fatalf("duplicate batch ID error = %v", err)
+	}
+	root, err := library.New(home)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, item := range []library.Item{first, second, third} {
+		if err := root.VerifyItem(context.Background(), item); err != nil {
+			t.Fatalf("batch organize damaged original %s: %v", item.MD5, err)
+		}
 	}
 }
 

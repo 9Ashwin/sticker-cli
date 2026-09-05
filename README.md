@@ -12,12 +12,14 @@
 
 [PRD](tasks/prd-sticker-cli.md) 已确认，[技术 SPEC](tasks/spec-sticker-cli.md) 和 [实施 GitHub Issues](tasks/issues-sticker-cli.md) 已就绪。首版使用现有 JSON 清单，SQLite 可重建索引作为有明确需求后的选项，JSONL 不作为素材库格式。
 
-已进入按 Issue 实施阶段，`packs list`、`packs install`（含 `--dry-run`）、`packs update`、`packs remove`、`setup`、`get` 以及个人收藏的添加、导入、导出、列表、描述修改和取消已实现。收藏可以通过 `favorites collections` 创建、重命名和删除自定义分组，也可以用 `favorites organize` 在分组间移动条目；分组元数据保存在 `.sticker/collections.json`，不改标准 `manifest.json` 或原图。批量整理仍以设计文档为准。
+已进入按 Issue 实施阶段，`packs list`、`packs install`（含 `--dry-run`）、`packs update`、`packs remove`、`setup`、`get` 以及个人收藏的添加、导入、导出、列表、描述修改和取消已实现。收藏可以通过 `favorites collections` 创建、重命名和删除自定义分组，也可以用 `favorites organize` 在分组间批量移动、重排或移出条目；`favorites list` 支持 `--collection` 和 `--sort manual|added|caption|md5`，整理前可用 `--dry-run` 预览。分组元数据保存在 `.sticker/collections.json`，导出时附带可选的 `collections.json` 扩展，不改标准 `manifest.json` 或原图。
 
 ```bash
 sticker favorites collections create work
 sticker favorites organize --collection favorites --ids <id> --move-to work
 sticker favorites list --collection work
+sticker favorites list --collection work --sort caption
+sticker favorites organize --collection work --order <id2>,<id1> --dry-run
 sticker favorites collections list
 ```
 
