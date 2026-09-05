@@ -117,6 +117,13 @@ func readBoundedRelative(ctx context.Context, root, relative string, limit int64
 	return buffer.Bytes(), nil
 }
 
+// ReadRelative reads a bounded file beneath root using the platform's secure
+// relative-open implementation. Callers must pass a relative path and handle
+// the returned error according to their own boundary contract.
+func ReadRelative(ctx context.Context, root, relative string, limit int64) ([]byte, error) {
+	return readBoundedRelative(ctx, root, relative, limit)
+}
+
 func rejectDuplicateJSONKeys(data []byte) error {
 	decoder := json.NewDecoder(bytes.NewReader(data))
 	if err := scanJSONValue(decoder); err != nil {

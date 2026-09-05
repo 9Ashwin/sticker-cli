@@ -139,7 +139,7 @@ func fetchCatalog(ctx context.Context, source Source, options Options) ([]Pack, 
 	var directoryBytes []byte
 	var err error
 	if source.IsLocal() {
-		directoryBytes, err = readLocal(source.LocalRoot, "packs.json", maxCatalogBytes)
+		directoryBytes, err = readLocal(ctx, source.LocalRoot, "packs.json", maxCatalogBytes)
 	} else {
 		fetcher := newFetcher(options.HTTPClient, options.Backoff)
 		directoryBytes, err = fetcher.get(ctx, source.manifestURL("packs.json"), maxCatalogBytes)
@@ -215,7 +215,7 @@ func readManifest(ctx context.Context, source Source, relative string, options O
 		return nil, wrapError("cancelled", "interrupted", "operation cancelled", "Retry the operation when ready.", err)
 	}
 	if source.IsLocal() {
-		return readLocal(source.LocalRoot, relative, maxCatalogBytes)
+		return readLocal(ctx, source.LocalRoot, relative, maxCatalogBytes)
 	}
 	return newFetcher(options.HTTPClient, options.Backoff).get(ctx, source.manifestURL(relative), maxCatalogBytes)
 }
@@ -316,28 +316,23 @@ func resolveHome(value string) (string, error) {
 	return filepath.Clean(abs), nil
 }
 
-func readLocal(root, relative string, limit int64) ([]byte, error) {
+func readLocal(ctx context.Context, root, relative string, limit int64) ([]byte, error) {
 	if err := validateRelativePath(relative); err != nil {
 		return nil, err
 	}
-	if err := rejectSymlinkComponents(root, relative); err != nil {
-		return nil, err
-	}
-	path := filepath.Join(root, filepath.FromSlash(relative))
-	file, err := os.Open(path)
+	data, err := library.ReadRelative(ctx, root, relative, limit)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil, newError("not_found", "source_not_found", fmt.Sprintf("source file %s was not found", relative), "Check the source directory and manifest paths.")
 		}
+		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+			return nil, wrapError("cancelled", "interrupted", "operation cancelled", "Retry the operation when ready.", err)
+		}
+		var libraryErr *library.Error
+		if errors.As(err, &libraryErr) {
+			return nil, &Error{Kind: libraryErr.Kind, Subtype: libraryErr.Subtype, Message: fmt.Sprintf("cannot read source file %s: %s", relative, libraryErr.Message), Hint: libraryErr.Hint, Retryable: libraryErr.Retryable, Err: err}
+		}
 		return nil, wrapError("io", "read_failed", fmt.Sprintf("cannot read source file %s", relative), "Check the source permissions.", err)
-	}
-	defer func() { _ = file.Close() }()
-	data, err := io.ReadAll(io.LimitReader(file, limit+1))
-	if err != nil {
-		return nil, wrapError("io", "read_failed", fmt.Sprintf("cannot read source file %s", relative), "Check the source permissions.", err)
-	}
-	if int64(len(data)) > limit {
-		return nil, invalidCollection("source file %s exceeds the %d byte limit", relative, limit)
 	}
 	return data, nil
 }
@@ -349,28 +344,6 @@ func validateRelativePath(value string) error {
 	clean := path.Clean(value)
 	if clean != value || clean == "." || clean == ".." || strings.HasPrefix(clean, "../") {
 		return newError("validation", "unsafe_path", "source manifest path escapes its directory", "Use a relative path beneath the source directory.")
-	}
-	return nil
-}
-
-func rejectSymlinkComponents(root, relative string) error {
-	absRoot, err := filepath.Abs(root)
-	if err != nil {
-		return wrapError("validation", "unsafe_path", "cannot resolve source root", "Use a valid local source directory.", err)
-	}
-	current := filepath.Clean(absRoot)
-	for _, part := range strings.Split(filepath.FromSlash(relative), string(filepath.Separator)) {
-		current = filepath.Join(current, part)
-		info, statErr := os.Lstat(current)
-		if statErr != nil {
-			if os.IsNotExist(statErr) {
-				continue
-			}
-			return wrapError("io", "read_failed", "cannot inspect source path", "Check the source permissions.", statErr)
-		}
-		if info.Mode()&os.ModeSymlink != 0 {
-			return newError("validation", "unsafe_path", "source path contains a symbolic link", "Remove symbolic links from the source path.")
-		}
 	}
 	return nil
 }
