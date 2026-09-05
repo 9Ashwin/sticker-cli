@@ -1,6 +1,6 @@
 # sticker-cli
 
-面向人和 AI Agent 的独立 Go 表情包 CLI，**当前处于规划阶段，尚未发布可安装版本**。
+面向人和 AI Agent 的独立 Go 表情包 CLI。CLI 程序与表情素材分开发布，安装程序本身不会下载原图。
 
 目标是不依赖微信账号或 MCP：用户选择精选／全量素材，Agent 离线检索并展示本地原图，用户持续添加、导入和导出私人收藏。
 
@@ -12,7 +12,32 @@
 
 [PRD](tasks/prd-sticker-cli.md) 已确认，[技术 SPEC](tasks/spec-sticker-cli.md) 和 [实施 GitHub Issues](tasks/issues-sticker-cli.md) 已就绪。首版使用现有 JSON 清单，SQLite 可重建索引作为有明确需求后的选项，JSONL 不作为素材库格式。
 
-已进入按 Issue 实施阶段，`packs list`、`packs install`（含 `--dry-run`）、`get` 以及个人收藏的添加、导入、列表、描述修改和取消已实现，其余命令仍以设计文档为准。当前尚未发布完整可用版本。
+已进入按 Issue 实施阶段，`packs list`、`packs install`（含 `--dry-run`）、`packs update`、`packs remove`、`get` 以及个人收藏的添加、导入、导出、列表、描述修改和取消已实现；分组、批量整理和 `setup` 仍以设计文档为准。
+
+## 安装 CLI
+
+发布归档提供 Linux amd64/arm64、macOS amd64/arm64 和 Windows amd64 二进制，并附带 SHA-256 校验。CI 在 Linux/macOS/Windows 上分别做原生 smoke test；发布工作流的跨平台构建不把素材放进归档。CLI 代码使用 MIT 许可证，素材仍以素材仓库中的声明为准。
+
+源码安装：
+
+```bash
+go install github.com/9Ashwin/sticker-cli/cmd/sticker@latest
+```
+
+Unix 用户也可以下载发布页的 `install.sh`。它默认把程序写入 `$HOME/.local/bin`（可用 `STICKER_INSTALL_DIR` 覆盖），支持显式版本：
+
+```bash
+curl -fsSL https://github.com/9Ashwin/sticker-cli/releases/latest/download/install.sh -o /tmp/sticker-install.sh
+sh /tmp/sticker-install.sh v0.1.0
+```
+
+Windows 用户下载发布页的 `install.ps1` 后在 PowerShell 中运行：
+
+```powershell
+.\install.ps1 -Version v0.1.0
+```
+
+安装器先校验归档和二进制的 SHA-256，失败时不会替换目标程序；素材需要之后通过 `packs install` 或 `setup` 单独选择。
 
 ## 源码开发
 
