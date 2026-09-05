@@ -30,11 +30,22 @@ func openRelativeNoFollow(root, relative string) (*os.File, error) {
 		_ = file.Close()
 		return nil, err
 	}
-	normalizedRoot := normalizeWindowsPath(root)
+	rootFile, err := os.Open(root)
+	if err != nil {
+		_ = file.Close()
+		return nil, err
+	}
+	rootFinal, err := finalPath(rootFile)
+	_ = rootFile.Close()
+	if err != nil {
+		_ = file.Close()
+		return nil, err
+	}
+	normalizedRoot := normalizeWindowsPath(rootFinal)
 	normalizedFinal := normalizeWindowsPath(final)
 	if !strings.EqualFold(normalizedFinal, normalizedRoot) && !strings.HasPrefix(strings.ToLower(normalizedFinal), strings.ToLower(normalizedRoot)+`\`) {
 		_ = file.Close()
-		return nil, errorf("validation", "unsafe_path", "Remove links from the library path.", "opened path escapes library root")
+		return nil, errorf("validation", "unsafe_path", "Remove links from the library path.", "opened path escapes library root (%s outside %s)", normalizedFinal, normalizedRoot)
 	}
 	return file, nil
 }
