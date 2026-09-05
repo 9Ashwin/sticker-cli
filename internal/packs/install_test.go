@@ -282,3 +282,293 @@ func TestPlanRequiresKnownPackID(t *testing.T) {
 		}
 	}
 }
+
+func TestInstallCopiesOriginalAndPublishesState(t *testing.T) {
+	fixture := newInstallFixture(t)
+	home := filepath.Join(t.TempDir(), "library")
+	result, err := Install(context.Background(), InstallOptions{Home: home, Source: fixture.root, PackID: "curated"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Added != 1 || result.Reused != 0 || result.DownloadBytes != fixture.item.Size || !result.Pack.Installed {
+		t.Fatalf("unexpected install result: %+v", result)
+	}
+	data, err := os.ReadFile(filepath.Join(home, filepath.FromSlash(fixture.item.Filename)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(data) != string(fixture.content) {
+		t.Fatalf("installed image changed: %q", data)
+	}
+	if _, err := os.Stat(filepath.Join(home, library.ManifestName)); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("install unexpectedly changed the personal manifest: %v", err)
+	}
+	state, installed, err := readInstalledState(home, "curated")
+	if err != nil || !installed || state.Revision != fixture.revision {
+		t.Fatalf("installed state was not published: %+v, %v, %v", state, installed, err)
+	}
+
+	repeated, err := Install(context.Background(), InstallOptions{Home: home, Source: fixture.root, PackID: "curated"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if repeated.Added != 0 || repeated.Reused != 1 || repeated.DownloadBytes != 0 {
+		t.Fatalf("repeat install did not reuse the original: %+v", repeated)
+	}
+}
+
+func TestInstallHTTPSFetchesOnlySelectedPackImages(t *testing.T) {
+	fixture := newInstallFixture(t)
+	allContent := []byte("GIF89a all-only fixture")
+	allMD5 := md5.Sum(allContent)
+	allSHA := sha256.Sum256(allContent)
+	allID := hex.EncodeToString(allMD5[:])
+	allItem := library.Item{MD5: allID, SHA256: hex.EncodeToString(allSHA[:]), Filename: "emoticons/" + allID + ".gif", Format: "gif", Size: int64(len(allContent)), Caption: "all only"}
+	allManifest, err := json.Marshal(library.Manifest{SchemaVersion: 1, Collection: "all", Items: []library.Item{fixture.item, allItem}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	allRevision := hashText(allManifest)
+	var directory directory
+	if err := json.Unmarshal(fixture.directory, &directory); err != nil {
+		t.Fatal(err)
+	}
+	directory.Packs = append(directory.Packs, entry{ID: "all", Name: "All", Description: "Everything", Manifest: "manifest.json", ManifestSHA256: allRevision, Count: 2, Size: fixture.item.Size + allItem.Size})
+	directoryBytes, err := json.Marshal(directory)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var mu sync.Mutex
+	var requests []string
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		requests = append(requests, r.URL.Path)
+		mu.Unlock()
+		switch r.URL.Path {
+		case "/packs.json":
+			_, _ = w.Write(directoryBytes)
+		case "/packs/curated.json":
+			_, _ = w.Write(fixture.manifest)
+		case "/emoticons/" + fixture.item.MD5 + ".gif":
+			_, _ = w.Write(fixture.content)
+		case "/manifest.json":
+			_, _ = w.Write(allManifest)
+		case "/emoticons/" + allItem.MD5 + ".gif":
+			t.Errorf("selected curated install requested all-only image")
+			_, _ = w.Write(allContent)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	t.Cleanup(server.Close)
+	home := filepath.Join(t.TempDir(), "library")
+	result, err := Install(context.Background(), InstallOptions{
+		Home:       home,
+		Source:     server.URL,
+		PackID:     "curated",
+		HTTPClient: server.Client(),
+		Backoff:    func(context.Context, time.Duration) error { return nil },
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Added != 1 || result.DownloadBytes != fixture.item.Size {
+		t.Fatalf("unexpected HTTPS install result: %+v", result)
+	}
+	mu.Lock()
+	got := append([]string(nil), requests...)
+	mu.Unlock()
+	if !containsPath(got, "/packs.json") || !containsPath(got, "/packs/curated.json") || !containsPath(got, "/emoticons/"+fixture.item.MD5+".gif") {
+		t.Fatalf("selected install did not request expected files: %v", got)
+	}
+	if containsPath(got, "/manifest.json") || containsPath(got, "/emoticons/"+allItem.MD5+".gif") {
+		t.Fatalf("selected install accessed full-pack files: %v", got)
+	}
+}
+
+func TestInstallFailureRetainsVerifiedStagingForRetry(t *testing.T) {
+	firstContent := []byte("GIF89a first staged")
+	secondContent := []byte("GIF89a second staged")
+	first := makeItem(firstContent, "first")
+	second := makeItem(secondContent, "second")
+	manifestBytes, err := json.Marshal(library.Manifest{SchemaVersion: 1, Collection: "curated", Items: []library.Item{first, second}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	revision := hashText(manifestBytes)
+	directoryBytes, err := json.Marshal(directory{SchemaVersion: 1, Packs: []entry{{ID: "curated", Name: "Curated", Description: "retry", Manifest: "packs/curated.json", ManifestSHA256: revision, Count: 2, Size: first.Size + second.Size}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var mu sync.Mutex
+	var requests []string
+	serveSecond := false
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		requests = append(requests, r.URL.Path)
+		ready := serveSecond
+		mu.Unlock()
+		switch r.URL.Path {
+		case "/packs.json":
+			_, _ = w.Write(directoryBytes)
+		case "/packs/curated.json":
+			_, _ = w.Write(manifestBytes)
+		case "/emoticons/" + first.MD5 + ".gif":
+			_, _ = w.Write(firstContent)
+		case "/emoticons/" + second.MD5 + ".gif":
+			if !ready {
+				http.Error(w, "temporary failure", http.StatusServiceUnavailable)
+				return
+			}
+			_, _ = w.Write(secondContent)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	t.Cleanup(server.Close)
+	home := filepath.Join(t.TempDir(), "library")
+	options := InstallOptions{Home: home, Source: server.URL, PackID: "curated", HTTPClient: server.Client(), Backoff: func(context.Context, time.Duration) error { return nil }}
+	if _, err := Install(context.Background(), options); err == nil {
+		t.Fatal("failed image transfer unexpectedly succeeded")
+	}
+	if _, installed, err := readInstalledState(home, "curated"); err != nil || installed {
+		t.Fatalf("failed install published state: %v, %v", err, installed)
+	}
+	mu.Lock()
+	firstRequests := countPath(requests, "/emoticons/"+first.MD5+".gif")
+	mu.Unlock()
+	if firstRequests != 1 {
+		t.Fatalf("expected one successful first-image request, got %d", firstRequests)
+	}
+	mu.Lock()
+	serveSecond = true
+	mu.Unlock()
+	result, err := Install(context.Background(), options)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Added != 2 || result.DownloadBytes != second.Size {
+		t.Fatalf("retry did not reuse staged image: %+v", result)
+	}
+	mu.Lock()
+	firstRequests = countPath(requests, "/emoticons/"+first.MD5+".gif")
+	secondRequests := countPath(requests, "/emoticons/"+second.MD5+".gif")
+	mu.Unlock()
+	if firstRequests != 1 || secondRequests != 4 {
+		t.Fatalf("unexpected retry requests: first=%d second=%d all=%v", firstRequests, secondRequests, requests)
+	}
+}
+
+func TestInstallCancellationLeavesStateUnpublished(t *testing.T) {
+	fixture := newInstallFixture(t)
+	started := make(chan struct{})
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/packs.json":
+			_, _ = w.Write(fixture.directory)
+		case "/packs/curated.json":
+			_, _ = w.Write(fixture.manifest)
+		case "/emoticons/" + fixture.item.MD5 + ".gif":
+			close(started)
+			<-r.Context().Done()
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	t.Cleanup(server.Close)
+	home := filepath.Join(t.TempDir(), "library")
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	result := make(chan error, 1)
+	go func() {
+		_, err := Install(ctx, InstallOptions{Home: home, Source: server.URL, PackID: "curated", HTTPClient: server.Client(), Backoff: func(context.Context, time.Duration) error { return nil }})
+		result <- err
+	}()
+	select {
+	case <-started:
+		cancel()
+	case <-time.After(5 * time.Second):
+		t.Fatal("image request did not start")
+	}
+	select {
+	case err := <-result:
+		assertPackError(t, err, "cancelled", "interrupted")
+	case <-time.After(5 * time.Second):
+		t.Fatal("cancelled install did not return")
+	}
+	if _, installed, err := readInstalledState(home, "curated"); err != nil || installed {
+		t.Fatalf("cancelled install published state: %v, %v", err, installed)
+	}
+}
+
+func TestPublishInstallRejectsMissingStagedImageBeforeState(t *testing.T) {
+	fixture := newInstallFixture(t)
+	prepared, err := prepareInstall(context.Background(), PlanOptions{Home: filepath.Join(t.TempDir(), "library"), Source: fixture.root, PackID: "curated"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	result := InstallResult{Source: prepared.source.Canonical, Target: prepared.root.Root, Pack: prepared.snapshot.pack, Revision: prepared.snapshot.pack.Revision}
+	_, err = publishInstall(context.Background(), prepared, map[string]stagedImage{}, result, nil)
+	assertPackError(t, err, "integrity", "invalid_image")
+	if _, installed, stateErr := readInstalledState(prepared.home, "curated"); stateErr != nil || installed {
+		t.Fatalf("missing staged image published state: %v, %v", stateErr, installed)
+	}
+}
+
+func TestConcurrentInstallPublishesOneState(t *testing.T) {
+	fixture := newInstallFixture(t)
+	home := filepath.Join(t.TempDir(), "library")
+	options := InstallOptions{Home: home, Source: fixture.root, PackID: "curated"}
+	results := make(chan InstallResult, 2)
+	errors := make(chan error, 2)
+	var group sync.WaitGroup
+	for range 2 {
+		group.Add(1)
+		go func() {
+			defer group.Done()
+			result, err := Install(context.Background(), options)
+			results <- result
+			errors <- err
+		}()
+	}
+	group.Wait()
+	close(results)
+	close(errors)
+	var added, reused int
+	for result := range results {
+		added += result.Added
+		reused += result.Reused
+	}
+	for err := range errors {
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	if added != 1 || reused != 1 {
+		t.Fatalf("concurrent installs did not re-read state: added=%d reused=%d", added, reused)
+	}
+	if _, installed, err := readInstalledState(home, "curated"); err != nil || !installed {
+		t.Fatalf("concurrent install did not publish state: %v, %v", err, installed)
+	}
+}
+
+func makeItem(content []byte, caption string) library.Item {
+	md5Sum := md5.Sum(content)
+	shaSum := sha256.Sum256(content)
+	id := hex.EncodeToString(md5Sum[:])
+	return library.Item{MD5: id, SHA256: hex.EncodeToString(shaSum[:]), Filename: "emoticons/" + id + ".gif", Format: "gif", Size: int64(len(content)), Caption: caption}
+}
+
+func containsPath(paths []string, target string) bool {
+	return countPath(paths, target) > 0
+}
+
+func countPath(paths []string, target string) int {
+	count := 0
+	for _, path := range paths {
+		if path == target {
+			count++
+		}
+	}
+	return count
+}

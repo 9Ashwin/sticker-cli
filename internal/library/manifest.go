@@ -166,6 +166,29 @@ func (l *Library) ReadManifest(ctx context.Context) (Manifest, error) {
 	return l.readManifestUnlocked(ctx)
 }
 
+// WithWriteLock runs fn while holding the library's cross-process exclusive
+// lock. The callback receives the latest personal manifest snapshot read under
+// that lock, so callers can validate concurrent changes before publishing
+// related private state.
+func (l *Library) WithWriteLock(ctx context.Context, fn func(Manifest) error) error {
+	if fn == nil {
+		return errorf("validation", "invalid_argument", "Provide a write callback.", "write callback is nil")
+	}
+	if err := l.ensureRoot(true); err != nil {
+		return err
+	}
+	lock, err := acquireLock(ctx, l.Root, true, l.lockTimeout())
+	if err != nil {
+		return err
+	}
+	defer func() { _ = lock.Close() }()
+	manifest, err := l.readManifestUnlocked(ctx)
+	if err != nil {
+		return err
+	}
+	return fn(manifest)
+}
+
 func (l *Library) readManifestUnlocked(ctx context.Context) (Manifest, error) {
 	path, err := l.rootPath(ManifestName)
 	if err != nil {

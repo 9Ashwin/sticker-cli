@@ -20,6 +20,26 @@ func runPackInstall(cmd *cobra.Command, options *rootOptions, args []string) err
 	if err != nil {
 		return err
 	}
+	if !dryRun {
+		result, err := packs.Install(cmd.Context(), packs.InstallOptions{
+			Home:   home,
+			Source: source,
+			PackID: args[0],
+		})
+		if err != nil {
+			return normalizePackError(err)
+		}
+		return writeResult(cmd, options, map[string]any{
+			"source":         result.Source,
+			"target":         result.Target,
+			"pack":           result.Pack,
+			"revision":       result.Revision,
+			"added":          result.Added,
+			"reused":         result.Reused,
+			"download_bytes": result.DownloadBytes,
+			"dry_run":        false,
+		}, false)
+	}
 	plan, err := packs.Plan(cmd.Context(), packs.PlanOptions{
 		Home:   home,
 		Source: source,
@@ -27,9 +47,6 @@ func runPackInstall(cmd *cobra.Command, options *rootOptions, args []string) err
 	})
 	if err != nil {
 		return normalizePackError(err)
-	}
-	if !dryRun {
-		return placeholder(cmd, "packs install (image download and commit)")
 	}
 	return writeResult(cmd, options, map[string]any{
 		"source":         plan.Source,
