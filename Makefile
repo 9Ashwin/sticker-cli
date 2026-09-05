@@ -2,7 +2,7 @@ VERSION ?= dev
 COMMIT := $(shell git rev-parse --short HEAD)
 LINT_VERSION := v2.13.2
 
-.PHONY: build test vet lint fmt-check build-cross quality
+.PHONY: build test vet lint fmt-check build-cross e2e-agent quality
 build:
 	CGO_ENABLED=0 go build -trimpath -ldflags "-X main.version=$(VERSION) -X main.commit=$(COMMIT)" -o bin/sticker ./cmd/sticker
 test:
@@ -19,4 +19,6 @@ build-cross:
 	CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o bin/sticker-linux-arm64 ./cmd/sticker
 	CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -o bin/sticker-darwin-amd64 ./cmd/sticker
 	CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -o bin/sticker-darwin-arm64 ./cmd/sticker
+e2e-agent:
+	GOTOOLCHAIN=auto ./scripts/agent-e2e.py
 quality: fmt-check test vet lint build build-cross
