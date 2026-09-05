@@ -48,6 +48,20 @@ Windows 用户下载发布页的 `install.ps1` 后在 PowerShell 中运行：
 
 安装器先校验归档和二进制的 SHA-256，失败时不会替换目标程序；素材需要之后通过 `packs install` 或 `setup` 单独选择。
 
+## Agent Skill 与验收
+
+跨客户端的使用指引位于 [`skills/sticker/SKILL.md`](skills/sticker/SKILL.md)，覆盖选包、离线检索、静态预览、原图展示、收藏导入、分组、排序和批量整理。可将它安装到任意支持 `SKILL.md` 的 Agent 技能目录；安装器遇到已有目录会拒绝操作，不覆盖现有指引：
+
+```bash
+./scripts/install-skill.sh /path/to/agent/skills/sticker
+```
+
+用临时 home 和本地 fixture 验收完整 Agent 流程（不访问微信、MCP 或公网素材源）：
+
+```bash
+make e2e-agent
+```
+
 ## 源码开发
 
 固定 Go 1.26.8、Cobra 1.10.2 与 golangci-lint 2.13.2。
