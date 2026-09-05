@@ -106,23 +106,12 @@ func Plan(ctx context.Context, options PlanOptions) (InstallPlan, error) {
 		if err := contextErr(ctx); err != nil {
 			return InstallPlan{}, wrapError("cancelled", "interrupted", "operation cancelled", "Retry the operation when ready.", err)
 		}
-		path, err := root.ItemPath(item)
-		if err != nil {
-			return InstallPlan{}, fromLibraryError(err)
-		}
-		info, err := os.Lstat(path)
-		if errors.Is(err, os.ErrNotExist) {
-			plan.Added++
-			plan.DownloadBytes += item.Size
-			continue
-		}
-		if err != nil {
-			return InstallPlan{}, wrapError("io", "read_failed", fmt.Sprintf("cannot inspect image %s", item.MD5), "Check the local library permissions.", err)
-		}
-		if !info.Mode().IsRegular() {
-			return InstallPlan{}, newError("integrity", "invalid_image", fmt.Sprintf("image %s is not a regular file", item.MD5), "Remove the damaged image before retrying.")
-		}
-		if err := library.VerifyFile(ctx, path, item, root.Limits); err != nil {
+		if err := root.VerifyItem(ctx, item); err != nil {
+			if errors.Is(err, os.ErrNotExist) {
+				plan.Added++
+				plan.DownloadBytes += item.Size
+				continue
+			}
 			return InstallPlan{}, fromLibraryError(err)
 		}
 		plan.Reused++
