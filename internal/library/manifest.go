@@ -150,6 +150,17 @@ func isLowerHex(value string, decodedBytes int) bool {
 // ReadManifest reads the root manifest. A missing manifest is an empty personal library;
 // an existing malformed manifest is always an integrity error.
 func (l *Library) ReadManifest(ctx context.Context) (Manifest, error) {
+	return l.readManifest(ctx, false)
+}
+
+// ReadManifestRequired reads a standard manifest that must exist. It is used
+// for imports and other operations where a missing source is not an empty
+// collection.
+func (l *Library) ReadManifestRequired(ctx context.Context) (Manifest, error) {
+	return l.readManifest(ctx, true)
+}
+
+func (l *Library) readManifest(ctx context.Context, required bool) (Manifest, error) {
 	if err := contextErr(ctx); err != nil {
 		return Manifest{}, err
 	}
@@ -163,7 +174,7 @@ func (l *Library) ReadManifest(ctx context.Context) (Manifest, error) {
 	if lock != nil {
 		defer func() { _ = lock.Close() }()
 	}
-	return l.readManifestUnlocked(ctx)
+	return l.readManifestUnlocked(ctx, required)
 }
 
 // WithWriteLock runs fn while holding the library's cross-process exclusive
@@ -182,14 +193,14 @@ func (l *Library) WithWriteLock(ctx context.Context, fn func(Manifest) error) er
 		return err
 	}
 	defer func() { _ = lock.Close() }()
-	manifest, err := l.readManifestUnlocked(ctx)
+	manifest, err := l.readManifestUnlocked(ctx, false)
 	if err != nil {
 		return err
 	}
 	return fn(manifest)
 }
 
-func (l *Library) readManifestUnlocked(ctx context.Context) (Manifest, error) {
+func (l *Library) readManifestUnlocked(ctx context.Context, required bool) (Manifest, error) {
 	path, err := l.rootPath(ManifestName)
 	if err != nil {
 		return Manifest{}, err
@@ -199,6 +210,9 @@ func (l *Library) readManifestUnlocked(ctx context.Context) (Manifest, error) {
 	}
 	data, err := readBoundedRelative(ctx, l.Root, ManifestName, l.Limits.withDefaults().ManifestBytes)
 	if errors.Is(err, os.ErrNotExist) {
+		if required {
+			return Manifest{}, errorf("not_found", "source_not_found", "Provide a directory containing manifest.json.", "manifest.json was not found")
+		}
 		return Manifest{SchemaVersion: 1, Collection: "personal", Items: []Item{}}, nil
 	}
 	if err != nil {
@@ -386,7 +400,7 @@ func (l *Library) WriteManifest(ctx context.Context, manifest Manifest) error {
 		return err
 	}
 	defer func() { _ = lock.Close() }()
-	if _, err := l.readManifestUnlocked(ctx); err != nil {
+	if _, err := l.readManifestUnlocked(ctx, false); err != nil {
 		return err
 	}
 	return l.atomicReplace(ctx, filepath.Join(l.Root, ManifestName), data)
@@ -405,7 +419,7 @@ func (l *Library) UpdateManifest(ctx context.Context, fn func(Manifest) (Manifes
 		return err
 	}
 	defer func() { _ = lock.Close() }()
-	current, err := l.readManifestUnlocked(ctx)
+	current, err := l.readManifestUnlocked(ctx, false)
 	if err != nil {
 		return err
 	}

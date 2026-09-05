@@ -123,3 +123,28 @@ func runFavoriteRemove(ctx context.Context, cmd *cobra.Command, options *rootOpt
 	}
 	return writeResult(cmd, options, result, false)
 }
+
+func runFavoriteImport(ctx context.Context, cmd *cobra.Command, options *rootOptions, args []string) error {
+	home, err := resolveHome(options)
+	if err != nil {
+		return err
+	}
+	overwriteCaptions, err := cmd.Flags().GetBool("overwrite-captions")
+	if err != nil {
+		return err
+	}
+	dryRun, err := cmd.Flags().GetBool("dry-run")
+	if err != nil {
+		return err
+	}
+	result, err := stickerfavorites.Import(ctx, stickerfavorites.ImportOptions{
+		Home:              home,
+		Source:            args[0],
+		OverwriteCaptions: overwriteCaptions,
+		DryRun:            dryRun,
+	})
+	if err != nil {
+		return err
+	}
+	return writeResult(cmd, options, result, false)
+}

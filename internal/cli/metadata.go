@@ -395,7 +395,7 @@ func favoriteImportMetadata() commandMetadata {
 		Effect:      effectWrite,
 		Parameters:  []parameterMetadata{{Name: "dir", Type: "string", Source: "argument", Description: "Source v1 material directory", Required: true}},
 		Flags:       []flagMetadata{{Name: "overwrite-captions", Type: "bool", Default: false, Description: "Replace existing personal captions"}, {Name: "dry-run", Type: "bool", Default: false, Description: "Validate without writing"}},
-		Result:      objectSchema("added", "int", "skipped", "int", "updated", "int", "conflicts", "int", "failed", "int", "committed", "bool"),
+		Result:      objectSchema("added", "int", "skipped", "int", "updated", "int", "conflicts", "int", "failed", "int", "committed", "bool", "dry_run", "bool"),
 		Errors:      defaultErrors(),
 		Examples:    []string{"sticker favorites import ./my-pack", "sticker favorites import ./my-pack --dry-run"},
 		Args:        cobra.ExactArgs(1),

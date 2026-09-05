@@ -289,8 +289,8 @@ func registerCommands(root *cobra.Command, registry *commandRegistry, options *r
 		}
 		return runFavoriteRemove(cmd.Context(), cmd, options, args)
 	})
-	addFavoriteCommand(favorites.Command, registry, favoriteImportMetadata(), func(cmd *cobra.Command, _ []string) error {
-		return placeholder(cmd, "favorites import")
+	addFavoriteCommand(favorites.Command, registry, favoriteImportMetadata(), func(cmd *cobra.Command, args []string) error {
+		return runFavoriteImport(cmd.Context(), cmd, options, args)
 	})
 	addFavoriteCommand(favorites.Command, registry, favoriteExportMetadata(), func(cmd *cobra.Command, _ []string) error {
 		return placeholder(cmd, "favorites export")
