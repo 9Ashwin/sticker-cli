@@ -1,4 +1,4 @@
-module github.com/9Ashwin/emoticon-cli
+module github.com/9Ashwin/sticker-cli
 
 go 1.26.8
 

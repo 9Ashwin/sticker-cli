@@ -1,35 +1,39 @@
-# 实施 Issues：emoticon-cli
+# 实施 Issues：sticker-cli
 
-状态：18 项已创建为 GitHub Issues，16 项在 CLI 仓库、2 项在素材仓库。编号 I01…I18 用于保持设计与实际 Issue 的映射。
+状态：I01…I21 已创建为 GitHub Issues（19 项在 CLI 仓库、2 项在素材仓库）；编号用于保持设计与实际 Issue 的映射。
 
-来源：[PRD](prd-emoticon-cli.md)、[SPEC](spec-emoticon-cli.md)。P1 为首个可用闭环，P2 为后续生命周期功能。
+来源：[PRD](prd-sticker-cli.md)、[SPEC](spec-sticker-cli.md)。P1 为首个可用闭环，P2 为后续生命周期功能。
 
 | 编号 | 标题 | 阶段 | 依赖 | 目标仓库 |
 | --- | --- | --- | --- | --- |
-| [I01](https://github.com/9Ashwin/emoticon-cli/issues/1) | Go 项目与 CLI 入口 | P1 | 无 | emoticon-cli |
-| [I02](https://github.com/9Ashwin/emoticon-cli/issues/2) | 标准素材库 I/O 与安全提交 | P1 | I01 | emoticon-cli |
-| [I03](https://github.com/9Ashwin/emoticon-cli/issues/3) | 命令帮助、schema 与结构化输出 | P1 | I01 | emoticon-cli |
-| [I04](https://github.com/9Ashwin/wechat-emoticon-pack/issues/1) | 素材包目录与修订合同 | P1 | 无 | 素材仓库 |
-| [I05](https://github.com/9Ashwin/wechat-emoticon-pack/issues/2) | 精选复核与素材仓库改名 | P1 | I04 | 素材仓库 |
-| [I06](https://github.com/9Ashwin/emoticon-cli/issues/4) | 素材源发现与离线目录缓存 | P1 | I02、I03、I04 | emoticon-cli |
-| [I07](https://github.com/9Ashwin/emoticon-cli/issues/5) | 安装预检与 dry-run | P1 | I06 | emoticon-cli |
-| [I08](https://github.com/9Ashwin/emoticon-cli/issues/6) | 按需下载与可恢复安装 | P1 | I07 | emoticon-cli |
-| [I09](https://github.com/9Ashwin/emoticon-cli/issues/7) | 离线检索与有界分页 | P1 | I02、I03 | emoticon-cli |
-| [I10](https://github.com/9Ashwin/emoticon-cli/issues/8) | 已验证原图读取 | P1 | I09 | emoticon-cli |
-| [I11](https://github.com/9Ashwin/emoticon-cli/issues/9) | 本地原图与已安装图片收藏 | P1 | I02、I03、I10 | emoticon-cli |
-| [I12](https://github.com/9Ashwin/emoticon-cli/issues/10) | 标准 v1 素材库合并导入 | P1 | I11 | emoticon-cli |
-| [I13](https://github.com/9Ashwin/emoticon-cli/issues/11) | 收藏列表、描述修改与取消 | P2 | I11 | emoticon-cli |
-| [I14](https://github.com/9Ashwin/emoticon-cli/issues/12) | 标准收藏包导出与迁移 | P2 | I12 | emoticon-cli |
-| [I15](https://github.com/9Ashwin/emoticon-cli/issues/13) | 显式素材更新 | P2 | I08、I11 | emoticon-cli |
-| [I16](https://github.com/9Ashwin/emoticon-cli/issues/14) | 素材包卸载与收藏保留 | P2 | I08、I11 | emoticon-cli |
-| [I17](https://github.com/9Ashwin/emoticon-cli/issues/15) | Go 二进制分发与平台验收 | P1 | I05、I08、I10、I12 | emoticon-cli |
-| [I18](https://github.com/9Ashwin/emoticon-cli/issues/16) | Agent Skill 与端到端使用验收 | P1 | I03、I05、I08、I10、I12、I17 | emoticon-cli |
+| [I01](https://github.com/9Ashwin/sticker-cli/issues/1) | Go 项目与 CLI 入口 | P1 | 无 | sticker-cli |
+| [I02](https://github.com/9Ashwin/sticker-cli/issues/2) | 标准素材库 I/O 与安全提交 | P1 | I01 | sticker-cli |
+| [I03](https://github.com/9Ashwin/sticker-cli/issues/3) | 命令帮助、schema 与结构化输出 | P1 | I01 | sticker-cli |
+| [I04](https://github.com/9Ashwin/sticker-ext/issues/1) | 素材包目录与修订合同 | P1 | 无 | 素材仓库 |
+| [I05](https://github.com/9Ashwin/sticker-ext/issues/2) | 精选复核与素材仓库改名 | P1 | I04 | 素材仓库 |
+| [I06](https://github.com/9Ashwin/sticker-cli/issues/4) | 素材源发现与离线目录缓存 | P1 | I02、I03、I04 | sticker-cli |
+| [I07](https://github.com/9Ashwin/sticker-cli/issues/5) | 安装预检与 dry-run | P1 | I06 | sticker-cli |
+| [I08](https://github.com/9Ashwin/sticker-cli/issues/6) | 按需下载与可恢复安装 | P1 | I07 | sticker-cli |
+| [I09](https://github.com/9Ashwin/sticker-cli/issues/7) | 离线检索与有界分页 | P1 | I02、I03 | sticker-cli |
+| [I10](https://github.com/9Ashwin/sticker-cli/issues/8) | 已验证原图读取 | P1 | I09 | sticker-cli |
+| [I11](https://github.com/9Ashwin/sticker-cli/issues/9) | 本地原图与已安装图片收藏 | P1 | I02、I03、I10 | sticker-cli |
+| [I12](https://github.com/9Ashwin/sticker-cli/issues/10) | 标准 v1 素材库合并导入 | P1 | I11 | sticker-cli |
+| [I13](https://github.com/9Ashwin/sticker-cli/issues/11) | 收藏列表、描述修改与取消 | P2 | I11 | sticker-cli |
+| [I14](https://github.com/9Ashwin/sticker-cli/issues/12) | 标准收藏包导出与迁移 | P2 | I12 | sticker-cli |
+| [I15](https://github.com/9Ashwin/sticker-cli/issues/13) | 显式素材更新 | P2 | I08、I11 | sticker-cli |
+| [I16](https://github.com/9Ashwin/sticker-cli/issues/14) | 素材包卸载与收藏保留 | P2 | I08、I11 | sticker-cli |
+| [I17](https://github.com/9Ashwin/sticker-cli/issues/15) | Go 二进制分发与平台验收 | P1 | I05、I08、I10、I12 | sticker-cli |
+| [I18](https://github.com/9Ashwin/sticker-cli/issues/16) | Agent Skill 与端到端使用验收 | P1 | I03、I05、I08、I10、I12、I17、I19、I20、I22 | sticker-cli |
+| [I19](https://github.com/9Ashwin/sticker-cli/issues/18) | 收藏分类与自定义分组 | P1 | I02、I03、I11、I12 | sticker-cli |
+| [I20](https://github.com/9Ashwin/sticker-cli/issues/19) | 收藏排序与批量整理 | P1 | I19 | sticker-cli |
+| [I21](https://github.com/9Ashwin/sticker-cli/issues/20) | 收藏整理端到端自动化验证 | P1 | I01–I20 | sticker-cli |
+| [I22](https://github.com/9Ashwin/sticker-cli/issues/21) | 一键初始化精选或全量素材 | P1 | I03、I06、I08 | sticker-cli |
 
-素材仓库当前为 `9Ashwin/wechat-emoticon-pack`，拟改名 `9Ashwin/agent-emoticon-packs`。创建其 Issues 时先解析实际仓库名，避免误投到 CLI。
+素材仓库统一命名为 `9Ashwin/sticker-ext`，由现有素材仓库改名。改名前后的 Issue 链接均指向该最终名称，GitHub 历史链接由平台重定向。
 
 ## I01：Go 项目与 CLI 入口
 
-GitHub：[9Ashwin/emoticon-cli#1](https://github.com/9Ashwin/emoticon-cli/issues/1)
+GitHub：[9Ashwin/sticker-cli#1](https://github.com/9Ashwin/sticker-cli/issues/1)
 
 范围：US-001。阶段：P1。类型：infra。优先级：high。
 
@@ -45,7 +49,7 @@ GitHub：[9Ashwin/emoticon-cli#1](https://github.com/9Ashwin/emoticon-cli/issues
 
 ## I02：标准素材库 I/O 与安全提交
 
-GitHub：[9Ashwin/emoticon-cli#2](https://github.com/9Ashwin/emoticon-cli/issues/2)
+GitHub：[9Ashwin/sticker-cli#2](https://github.com/9Ashwin/sticker-cli/issues/2)
 
 范围：横切 FR-4/7/15。阶段：P1。类型：backend。优先级：high。
 
@@ -62,7 +66,7 @@ GitHub：[9Ashwin/emoticon-cli#2](https://github.com/9Ashwin/emoticon-cli/issues
 
 ## I03：命令帮助、schema 与结构化输出
 
-GitHub：[9Ashwin/emoticon-cli#3](https://github.com/9Ashwin/emoticon-cli/issues/3)
+GitHub：[9Ashwin/sticker-cli#3](https://github.com/9Ashwin/sticker-cli/issues/3)
 
 范围：US-002。阶段：P1。类型：backend。优先级：high。
 
@@ -79,7 +83,7 @@ GitHub：[9Ashwin/emoticon-cli#3](https://github.com/9Ashwin/emoticon-cli/issues
 
 ## I04：素材包目录与修订合同
 
-GitHub：[9Ashwin/wechat-emoticon-pack#1](https://github.com/9Ashwin/wechat-emoticon-pack/issues/1)
+GitHub：[9Ashwin/sticker-ext#1](https://github.com/9Ashwin/sticker-ext/issues/1)
 
 范围：US-012。阶段：P1。类型：infra。优先级：high。
 
@@ -95,7 +99,7 @@ GitHub：[9Ashwin/wechat-emoticon-pack#1](https://github.com/9Ashwin/wechat-emot
 
 ## I05：精选复核与素材仓库改名
 
-GitHub：[9Ashwin/wechat-emoticon-pack#2](https://github.com/9Ashwin/wechat-emoticon-pack/issues/2)
+GitHub：[9Ashwin/sticker-ext#2](https://github.com/9Ashwin/sticker-ext/issues/2)
 
 范围：US-012。阶段：P1。类型：infra。优先级：high。
 
@@ -104,7 +108,7 @@ GitHub：[9Ashwin/wechat-emoticon-pack#2](https://github.com/9Ashwin/wechat-emot
 验收：
 
 - [ ] 逐张复核 124 张候选的画面与描述，删除或更正不适合项；数量按最终清单生成。
-- [ ] 将素材远端仓库改名 agent-emoticon-packs，保留历史与原图。
+- [ ] 将素材远端仓库改名 sticker-ext，保留历史与原图。
 - [ ] 同步 README、AGENTS、示例和仓库说明中的名称及链接；更新包修订。
 - [ ] 对新地址做目录/清单/样本图读取验证，并记录旧消费端兼容结果。
 
@@ -112,7 +116,7 @@ GitHub：[9Ashwin/wechat-emoticon-pack#2](https://github.com/9Ashwin/wechat-emot
 
 ## I06：素材源发现与离线目录缓存
 
-GitHub：[9Ashwin/emoticon-cli#4](https://github.com/9Ashwin/emoticon-cli/issues/4)
+GitHub：[9Ashwin/sticker-cli#4](https://github.com/9Ashwin/sticker-cli/issues/4)
 
 范围：US-003。阶段：P1。类型：backend。优先级：high。
 
@@ -129,7 +133,7 @@ GitHub：[9Ashwin/emoticon-cli#4](https://github.com/9Ashwin/emoticon-cli/issues
 
 ## I07：安装预检与 dry-run
 
-GitHub：[9Ashwin/emoticon-cli#5](https://github.com/9Ashwin/emoticon-cli/issues/5)
+GitHub：[9Ashwin/sticker-cli#5](https://github.com/9Ashwin/sticker-cli/issues/5)
 
 范围：US-004。阶段：P1。类型：backend。优先级：high。
 
@@ -146,7 +150,7 @@ GitHub：[9Ashwin/emoticon-cli#5](https://github.com/9Ashwin/emoticon-cli/issues
 
 ## I08：按需下载与可恢复安装
 
-GitHub：[9Ashwin/emoticon-cli#6](https://github.com/9Ashwin/emoticon-cli/issues/6)
+GitHub：[9Ashwin/sticker-cli#6](https://github.com/9Ashwin/sticker-cli/issues/6)
 
 范围：US-004。阶段：P1。类型：backend。优先级：high。
 
@@ -163,7 +167,7 @@ GitHub：[9Ashwin/emoticon-cli#6](https://github.com/9Ashwin/emoticon-cli/issues
 
 ## I09：离线检索与有界分页
 
-GitHub：[9Ashwin/emoticon-cli#7](https://github.com/9Ashwin/emoticon-cli/issues/7)
+GitHub：[9Ashwin/sticker-cli#7](https://github.com/9Ashwin/sticker-cli/issues/7)
 
 范围：US-005。阶段：P1。类型：backend。优先级：high。
 
@@ -180,23 +184,24 @@ GitHub：[9Ashwin/emoticon-cli#7](https://github.com/9Ashwin/emoticon-cli/issues
 
 ## I10：已验证原图读取
 
-GitHub：[9Ashwin/emoticon-cli#8](https://github.com/9Ashwin/emoticon-cli/issues/8)
+GitHub：[9Ashwin/sticker-cli#8](https://github.com/9Ashwin/sticker-cli/issues/8)
 
 范围：US-006。阶段：P1。类型：backend。优先级：high。
 
-依赖：I09。SPEC：§4.1、4.3、5.3。验证组：T06。
+依赖：I09。SPEC：§4.1、4.3–4.4、5.3。验证组：T06。
 
 验收：
 
 - [ ] get 完整 MD5 校验目标文件，返回绝对路径与来源信息。
 - [ ] 缺图/损坏给出稳定错误和恢复建议；结果不含 base64 或原图字节。
 - [ ] 保留 GIF 内容并做真实静态/动画客户端展示检查，记录客户端差异。
+- [ ] `get --preview` 为静态 WebP 生成或复用 PNG 预览路径，预览不改变原图哈希；动画 WebP 或解码失败返回稳定错误。
 
 相关实现运行聚焦回归、Go test/vet/lint；并发和文件提交增加 race 与目标平台验证。素材任务运行清单/原图校验及文档链接检查。
 
 ## I11：本地原图与已安装图片收藏
 
-GitHub：[9Ashwin/emoticon-cli#9](https://github.com/9Ashwin/emoticon-cli/issues/9)
+GitHub：[9Ashwin/sticker-cli#9](https://github.com/9Ashwin/sticker-cli/issues/9)
 
 范围：US-007。阶段：P1。类型：backend。优先级：high。
 
@@ -213,7 +218,7 @@ GitHub：[9Ashwin/emoticon-cli#9](https://github.com/9Ashwin/emoticon-cli/issues
 
 ## I12：标准 v1 素材库合并导入
 
-GitHub：[9Ashwin/emoticon-cli#10](https://github.com/9Ashwin/emoticon-cli/issues/10)
+GitHub：[9Ashwin/sticker-cli#10](https://github.com/9Ashwin/sticker-cli/issues/10)
 
 范围：US-009。阶段：P1。类型：backend。优先级：high。
 
@@ -230,7 +235,7 @@ GitHub：[9Ashwin/emoticon-cli#10](https://github.com/9Ashwin/emoticon-cli/issue
 
 ## I13：收藏列表、描述修改与取消
 
-GitHub：[9Ashwin/emoticon-cli#11](https://github.com/9Ashwin/emoticon-cli/issues/11)
+GitHub：[9Ashwin/sticker-cli#11](https://github.com/9Ashwin/sticker-cli/issues/11)
 
 范围：US-008。阶段：P2。类型：backend。优先级：medium。
 
@@ -246,7 +251,7 @@ GitHub：[9Ashwin/emoticon-cli#11](https://github.com/9Ashwin/emoticon-cli/issue
 
 ## I14：标准收藏包导出与迁移
 
-GitHub：[9Ashwin/emoticon-cli#12](https://github.com/9Ashwin/emoticon-cli/issues/12)
+GitHub：[9Ashwin/sticker-cli#12](https://github.com/9Ashwin/sticker-cli/issues/12)
 
 范围：US-010。阶段：P2。类型：backend。优先级：medium。
 
@@ -263,7 +268,7 @@ GitHub：[9Ashwin/emoticon-cli#12](https://github.com/9Ashwin/emoticon-cli/issue
 
 ## I15：显式素材更新
 
-GitHub：[9Ashwin/emoticon-cli#13](https://github.com/9Ashwin/emoticon-cli/issues/13)
+GitHub：[9Ashwin/sticker-cli#13](https://github.com/9Ashwin/sticker-cli/issues/13)
 
 范围：US-011。阶段：P2。类型：backend。优先级：medium。
 
@@ -279,7 +284,7 @@ GitHub：[9Ashwin/emoticon-cli#13](https://github.com/9Ashwin/emoticon-cli/issue
 
 ## I16：素材包卸载与收藏保留
 
-GitHub：[9Ashwin/emoticon-cli#14](https://github.com/9Ashwin/emoticon-cli/issues/14)
+GitHub：[9Ashwin/sticker-cli#14](https://github.com/9Ashwin/sticker-cli/issues/14)
 
 范围：US-011。阶段：P2。类型：backend。优先级：medium。
 
@@ -295,7 +300,7 @@ GitHub：[9Ashwin/emoticon-cli#14](https://github.com/9Ashwin/emoticon-cli/issue
 
 ## I17：Go 二进制分发与平台验收
 
-GitHub：[9Ashwin/emoticon-cli#15](https://github.com/9Ashwin/emoticon-cli/issues/15)
+GitHub：[9Ashwin/sticker-cli#15](https://github.com/9Ashwin/sticker-cli/issues/15)
 
 范围：US-001。阶段：P1。类型：infra。优先级：high。
 
@@ -307,12 +312,13 @@ GitHub：[9Ashwin/emoticon-cli#15](https://github.com/9Ashwin/emoticon-cli/issue
 - [ ] 提供 go install 与各平台 PATH 文档，安装程序本身零素材下载。
 - [ ] 固定代码许可证后发布，原图不打进 CLI Release。
 - [ ] 测试单二进制无 Go/Node/Python/MCP 运行依赖；原生 smoke 与交叉编译分开记录。
+- [ ] 发布版本固定的跨平台归档、`checksums.txt`、Unix shell 和 Windows PowerShell 安装入口；默认写入用户目录、无需 sudo，校验失败拒绝安装且不把原图打进归档。
 
 相关实现运行聚焦回归、Go test/vet/lint；并发和文件提交增加 race 与目标平台验证。素材任务运行清单/原图校验及文档链接检查。
 
 ## I18：Agent Skill 与端到端使用验收
 
-GitHub：[9Ashwin/emoticon-cli#16](https://github.com/9Ashwin/emoticon-cli/issues/16)
+GitHub：[9Ashwin/sticker-cli#16](https://github.com/9Ashwin/sticker-cli/issues/16)
 
 范围：US-013。阶段：P1。类型：infra。优先级：high。
 
@@ -320,15 +326,83 @@ GitHub：[9Ashwin/emoticon-cli#16](https://github.com/9Ashwin/emoticon-cli/issue
 
 验收：
 
-- [ ] 发布简短 Agent Skill：选包、检索、预览、展示、收藏及标准库导入。
+- [ ] 发布简短 Agent Skill：选包、检索、预览、展示、收藏、分组及批量整理。
+- [ ] Skill 同时说明 `setup --pack curated|all` convenience，并明确正式 `packs install` 和本地 `favorites import` 接口。
 - [ ] 示例与 help/schema 一致，Skill 安装不覆盖用户已有指引。
-- [ ] 至少一个真实 Agent 完成精选安装→离线检索→预览展示→收藏流程。
+- [ ] 至少一个真实 Agent 完成精选安装→离线检索→预览展示→收藏→分组排序→批量整理流程。
 - [ ] 文件可用、静态预览和动画播放分开报告，不宣称外部聊天发送。
 
 相关实现运行聚焦回归、Go test/vet/lint；并发和文件提交增加 race 与目标平台验证。素材任务运行清单/原图校验及文档链接检查。
 
+## I19：收藏分类与自定义分组
+
+GitHub：[9Ashwin/sticker-cli#18](https://github.com/9Ashwin/sticker-cli/issues/18)
+
+范围：US-014。阶段：P1。类型：backend。优先级：high。
+
+依赖：I02、I03、I11、I12。SPEC：§3.6、4.1、5.5。验证组：T16。
+
+验收：
+
+- [ ] 提供默认收藏分组，以及创建、重命名、列出和删除自定义分组；删除分组前明确处理其中条目。
+- [ ] 收藏条目可加入或移出分组，同一原图只保存一份，不破坏标准 `manifest.json`。
+- [ ] `favorites import` 没有分组扩展时把条目放入默认分组；有扩展时验证 ID、名称和引用。
+- [ ] 分组元数据损坏返回稳定完整性错误，不能覆盖有效数据；写入使用原子提交。
+
+Demo path：在临时 home 中导入两个 v1 条目，创建 `work` 分组并把一个条目加入，再列出分组确认成员和原图路径。
+
+## I20：收藏排序与批量整理
+
+GitHub：[9Ashwin/sticker-cli#19](https://github.com/9Ashwin/sticker-cli/issues/19)
+
+范围：US-015。阶段：P1。类型：backend。优先级：high。
+
+依赖：I19。SPEC：§3.6、4.1、5.4–5.5。验证组：T17。
+
+验收：
+
+- [ ] `favorites list` 支持分组筛选与 `manual`、`added`、`caption`、`md5` 四种稳定排序。
+- [ ] 非交互命令支持按 ID 批量移动、重排和取消收藏，`--dry-run` 不写入。
+- [ ] 无效 ID、重复顺序或并发版本变化整体失败，已有收藏和顺序保持不变。
+- [ ] 分组与顺序元数据保持可供后续导出扩展的结构；旧客户端仍可读取 v1 清单和原图。
+
+Demo path：在两个分组各放入两个 fixture，分别执行手动重排、caption 排序和批量移动，断言 JSON 顺序与 dry-run 前后一致。
+
+## I21：收藏整理端到端自动化验证
+
+GitHub：[9Ashwin/sticker-cli#20](https://github.com/9Ashwin/sticker-cli/issues/20)
+
+范围：US-016。阶段：P1。类型：infra。优先级：high。
+
+依赖：I01、I02、I03、I04、I05、I06、I07、I08、I09、I10、I11、I12、I13、I14、I15、I16、I17、I18、I19、I20。SPEC：§4、5、8。验证组：T18。
+
+验收：
+
+- [ ] CI 中的自动化 E2E 使用临时 home 和本地 fixture，完成列出精选、安装、离线搜索、读取、v1 清单导入、创建分组、排序和批量整理，并断言 JSON、哈希、分组与最终清单。
+- [ ] fixture 图片哈希错误、分组元数据损坏和无效 ID 均返回稳定错误、非零退出且不发布不完整状态。
+- [ ] 测试不访问微信、MCP、账号凭据或真实公网素材源，运行后清理临时状态并可独立重复。
+- [ ] CI 任务在无 CGO 环境通过，并把原图读取、静态 WebP 预览（如 fixture 包含 WebP）与动图原始字节验证分开报告。
+- [ ] E2E 覆盖 `setup --pack curated`、显式本地 `sticker-ext` 源和精选不请求全量独有图片，并覆盖发布归档校验失败。
+
+Demo path：在 CI 的单个测试命令中从空 home 运行完整流程，随后再次运行确认结果和顺序稳定。
+
 ## 创建结果
 
-I04/I05 已建在素材仓库，其余已建在 CLI 仓库；各 Issue 正文中的依赖均已改写为真实跨仓库链接。当前仅完成任务创建，尚未启动实现。
+I04/I05 已建在素材仓库，其余已建在 CLI 仓库；各 Issue 正文中的依赖均已改写为真实跨仓库链接。I19…I22 已按确认的整理与 setup 拆分创建。GitHub CLI 版本不支持原生 blocked-by 时，正文保留真实 Issue 链接作为依赖证据。本清单没有新增 SQLite 或 JSONL 任务：首版使用现有 JSON 素材格式，后续索引需求按 SPEC §3.5 再评估。
 
-本清单没有新增 SQLite 或 JSONL 任务：首版使用现有 JSON 素材格式，后续索引需求按 SPEC §3.5 再评估。
+## I22：一键初始化精选或全量素材
+
+GitHub：[9Ashwin/sticker-cli#21](https://github.com/9Ashwin/sticker-cli/issues/21)
+
+范围：US-004、FR-24。阶段：P1。类型：backend。优先级：high。
+
+依赖：I03、I06、I08。SPEC：§4.1、4.5、5.1。验证组：T04、T18。
+
+验收：
+
+- [ ] 在 I08 合并后的主干上，运行 `sticker setup` 尚不存在；提交后默认调用精选安装并返回 `setup:true`，显式 `--pack all` 才安装全量。
+- [ ] `--source`、`--dry-run` 与正式 `packs install` 使用相同的修订、校验、锁和原子提交语义，不复制另一套下载逻辑。
+- [ ] 本地 `sticker-ext` 源的精选 setup 不读取全量独有文件；全量必须由 `--pack all` 显式选择。
+- [ ] 无效包 ID、损坏清单、哈希错误和取消均返回稳定错误，不发布不完整安装状态；dry-run 不创建库目录、锁或缓存。
+
+Demo path：对本地 `sticker-ext` fixture 运行 `setup --pack curated --dry-run` 和实际 setup，再显式运行 `setup --pack all`，断言请求白名单、输出和安装状态。

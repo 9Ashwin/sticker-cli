@@ -1,16 +1,16 @@
 # SPEC：独立 Go 表情包 CLI
 
-输入：[已确认 PRD](prd-emoticon-cli.md)。基线提交：`5380f25`。目标仓库：`9Ashwin/emoticon-cli`，文档分支 `main`。
+输入：[已确认 PRD](prd-sticker-cli.md)。基线提交：`5380f25`。目标仓库：`9Ashwin/sticker-cli`，文档分支 `main`。
 状态：实施 Issue 的技术设计基线；命令与结构均为实施合同，不是现有实现。
 
 ## 1. 范围与主要决策
 
-覆盖 US-001–013、FR-1–18。按 PRD 的 P1/P2 交付；直接微信迁移、MCP、图片生成与外部消息发送不进入运行依赖。
+覆盖 US-001–016、FR-1–25。按 PRD 的 P1/P2 交付；直接微信迁移、MCP、图片生成与外部消息发送不进入运行依赖。
 
 | 决策 | 选择 | 原因 |
 | --- | --- | --- |
 | 运行时 | Go 单二进制，无 CGO | 满足跨平台、Agent 可执行和运行依赖少的目标 |
-| 命令树 | Cobra，参数可出现在位置参数前后 | 沿用飞书 CLI 的交互惯例 |
+| 命令树 | Cobra，参数可出现在位置参数前后 | 统一命令注册、帮助和参数解析 |
 | 数据 | v1 manifest + 原始文件 | 直接兼容现有素材库，不引入收藏专有格式或数据库 |
 | 内容标识 | MD5 定位，SHA-256 验证冲突 | 兼容旧文件名，同时拒绝 MD5 相同而内容不同的文件 |
 | 输出 | 默认 JSON envelope；可选 table | 机器解析稳定，人与 Agent 共用命令 |
@@ -23,13 +23,13 @@ Go 最低版本与工具版本在初始化 Issue 中核对官方支持状态后�
 ## 2. 组件与依赖
 
 ```text
-cmd/emoticon/       main：信号、退出码、版本注入
+cmd/sticker/        main：信号、退出码、版本注入
 internal/cli/      Cobra 注册、help/schema、参数投影
 internal/output/   JSON/table、错误 envelope
 internal/apperror/ 稳定 type/subtype 与退出码
 internal/library/ v1 清单、文件校验、导入、收藏、读写锁与提交
 internal/packs/   包目录、HTTPS/本地源、安装更新、安装状态
-skills/emoticon/  跨命令 Agent 工作流
+skills/sticker/   跨命令 Agent 工作流
 ```
 
 依赖方向：`cli → packs/library/output`；`packs → library`；`output → apperror`。library 不导入 cli、packs 或 Cobra。首次实现按这些职责组织，单个操作无需拆成新 package。
@@ -46,16 +46,16 @@ Cobra 注册真实参数；schema 读取实际参数定义，并附带每条命�
 <home>/
   manifest.json                 个人素材的标准 v1 清单
   emoticons/<md5>.<format>       共享原图，收藏与已安装包共用
-  .emoticon/
+  .sticker/
     packs/<id>.json             已安装包状态，内含该包的 v1 清单
     catalogs/<source-hash>.json 包目录缓存与 fetched_at
     write.lock                 跨进程文件锁
     staging/                   尚未发布的下载或导入文件
 ```
 
-`manifest.json` 只收录用户添加、收藏或导入的条目；搜索集合是它与已安装包条目的并集。单独读取此标准清单即可使用个人素材，不要求理解 `.emoticon/`。个人库始终不依赖公共包状态才能找到原图。
+`manifest.json` 只收录用户添加、收藏或导入的条目；搜索集合是它与已安装包条目的并集。单独读取此标准清单即可使用个人素材，不要求理解 `.sticker/`。个人库始终不依赖公共包状态才能找到原图。
 
-`--home` > `EMOTICON_HOME` > `os.UserConfigDir()/emoticon`。输出路径先转成绝对路径；纯读命令在空库不创建目录。手工编辑素材前应结束正在运行的 CLI 写操作。
+`--home` > `STICKER_HOME` > `os.UserConfigDir()/sticker`。输出路径先转成绝对路径；纯读命令在空库不创建目录。手工编辑素材前应结束正在运行的 CLI 写操作。
 
 ### 3.2 标准素材清单
 
@@ -87,8 +87,8 @@ Cobra 注册真实参数；schema 读取实际参数定义，并附带每条命�
     "description": "适合日常交流的表情，已复核描述",
     "manifest": "packs/curated.json",
     "manifest_sha256": "<64 lowercase hex>",
-    "count": 124,
-    "size": 22821282
+    "count": 120,
+    "size": 21703567
   }]
 }
 ```
@@ -101,7 +101,7 @@ Cobra 注册真实参数；schema 读取实际参数定义，并附带每条命�
 
 ### 3.4 安装状态
 
-`.emoticon/packs/<id>.json` 保存 `schema_version:1`、`id`、`source`、`revision`、`installed_at`、`manifest`。manifest 是完整标准 v1 对象，其文件路径仍以 `<home>` 为根，不能以状态文件所在目录为根。
+`.sticker/packs/<id>.json` 保存 `schema_version:1`、`id`、`source`、`revision`、`installed_at`、`manifest`。manifest 是完整标准 v1 对象，其文件路径仍以 `<home>` 为根，不能以状态文件所在目录为根。
 
 同一个 home 的包 ID 唯一；同 ID 不同源返回 `conflict/source_conflict`，需先移除旧包。相同修订重复安装仅校验和复用原图。CLI 版本与素材修订独立。
 
@@ -121,6 +121,26 @@ Cobra 注册真实参数；schema 读取实际参数定义，并附带每条命�
 
 若仅增加查询索引：JSON 与原图仍是事实来源；索引保存清单内容哈希，修改后失效并可重建；索引丢失不丢收藏，SQLite 文件不进入素材仓库。若未来希望数据库成为权威写入存储，应另行修订产品合同，不能悄悄引入 JSON/SQLite 双重权威。首版也不增加 JSONL 事件日志。
 
+### 3.6 收藏分组与排序元数据
+
+标准 v1 `manifest.json` 继续只保存条目和原图信息；分组、成员关系与顺序保存在 CLI 自有的 `.sticker/collections.json`。这样旧客户端仍可读取标准清单，整理功能也不会把非标准字段写入公共素材格式。
+
+```json
+{
+  "schema_version": 1,
+  "collections": [{
+    "id": "favorites",
+    "name": "我的收藏",
+    "position": 0,
+    "items": [{"id": "<md5>", "position": 0, "added_at": "2026-01-02T03:04:05Z"}]
+  }]
+}
+```
+
+`favorites` 是不可删除的默认分组；自定义分组 ID 使用 `[a-z][a-z0-9_-]{0,63}`，名称为非空 UTF-8 文本且不超过 128 字节。一个条目可以出现在多个分组，但原图在 `emoticons/` 中只有一份。分组引用的 ID 必须存在于个人 `manifest.json`，否则读取和写入均返回 `integrity/invalid_collection`，不能自动清空或修复有效数据。
+
+列表支持 `manual`、`added`、`caption` 和 `md5` 四种排序。`manual` 使用分组内的 position；`added` 使用分组条目的 `added_at`，旧导入条目缺失时按 manifest 顺序补齐；`caption` 和 `md5` 以 MD5 作为最终稳定键。批量移动、重排和取消收藏先完整校验所有 ID，再在同一个 `.sticker/collections.json` 原子替换中提交；任何无效 ID 都不产生部分变更。导出可附带同名 `collections.json` 扩展，导入时文件缺失即把所有条目放入默认分组，旧客户端忽略该扩展不影响 v1 读取。
+
 ## 4. CLI 合同
 
 ### 4.1 公共参数与命令
@@ -134,17 +154,20 @@ Cobra 注册真实参数；schema 读取实际参数定义，并附带每条命�
 | packs list | --source ROOT, --offline | items（含 installed/revision）, fetched_at, stale | P1 |
 | packs install ID | --source ROOT, --dry-run | pack, revision, added, reused, download_bytes | P1 |
 | search QUERY | --pack ID, --favorites, --limit N, --offset N | items, total, next_offset, has_more | P1 |
-| get ID | 完整小写 MD5 | item | P1 |
+| setup | --pack curated\|all（默认 curated）, --source ROOT, --dry-run | 与 install 相同并附 setup 标记 | P1 |
+| get ID | 完整小写 MD5；可选 `--preview` | item（含可选 preview_path） | P1 |
 | favorites add [PATH] | --id ID（二选一）, --caption TEXT, --dry-run | item, added, updated | P1 |
-| favorites list | --limit N, --offset N | 与 search 相同分页结构 | P1 |
+| favorites list | --collection ID, --sort manual\|added\|caption\|md5, --limit N, --offset N | 与 search 相同分页结构 | P1 |
+| favorites collections | list；create NAME；rename ID NAME；remove ID | collections, changed | P1 |
+| favorites organize | --collection ID, --ids ID..., --move-to ID, --order ID..., --dry-run | moved, reordered, removed, committed | P1 |
 | favorites import DIR | --overwrite-captions, --dry-run | added, skipped, updated, conflicts, failed, committed | P1 |
 | favorites describe ID | 必须显式 --caption TEXT, --dry-run | item, updated | P2 |
-| favorites remove ID | --dry-run | removed, retained_original | P2 |
+| favorites remove ID... | --dry-run | removed, retained_original, committed | P2 |
 | favorites export DIR | --dry-run | path, count, size | P2 |
 | packs update ID | --dry-run；沿用已保存 source | 与 install 相同 | P2 |
 | packs remove ID | --dry-run | removed, retained_bytes | P2 |
 
-item：`id`（等于 md5）、`md5`、`sha256`、`filename`、`format`、`size`、`caption`、`path`（绝对）、`favorite`、`packs`（排序后的包 ID 数组）。没有自定义 Markdown 拼接，也不自动打开外部应用。
+item：`id`（等于 md5）、`md5`、`sha256`、`filename`、`format`、`size`、`caption`、`path`（绝对）、`favorite`、`packs`（排序后的包 ID 数组）。`get --preview` 在静态 WebP 时额外返回绝对 `preview_path`（PNG）；预览使用 SHA-256 作为缓存身份，原图 `path` 与内容标识不变。没有自定义 Markdown 拼接，也不自动打开外部应用。
 
 ### 4.2 输出与错误
 
@@ -155,13 +178,13 @@ message/hint 为面向人的文字，不是分支依据；type/subtype/退出码
 
 | type | subtype 示例 | 退出码 |
 | --- | --- | --- |
-| validation | invalid_argument, unsupported_schema, unsafe_path, output_limit | 2 |
+| validation | invalid_argument, unsupported_schema, unsafe_path, output_limit, unsupported_format | 2 |
 | not_found | pack_not_found, item_not_found, source_not_found | 3 |
 | network | timeout, request_failed, http_error | 4 |
-| integrity | hash_mismatch, invalid_manifest, invalid_image | 5 |
+| integrity | hash_mismatch, invalid_manifest, invalid_image, invalid_collection | 5 |
 | conflict | digest_conflict, source_conflict, destination_exists, library_busy, state_changed | 6 |
 | io | permission_denied, disk_full, read_failed, write_failed | 7 |
-| internal | unexpected | 1 |
+| internal | unexpected, unimplemented | 1 |
 | cancelled | interrupted | 130 |
 
 ### 4.3 搜索与分页
@@ -171,6 +194,16 @@ message/hint 为面向人的文字，不是分支依据；type/subtype/退出码
 重复项 caption 优先级：存在个人记录时使用个人 caption（包括显式空值）；否则按 pack ID 字典序选择首个非空 caption。查询结果按 MD5 升序。offset ≥ total 返回空列表；limit 1–100，默认 10；offset ≥ 0。
 
 翻页时修改素材会改变顺序，用户应重启检索；首版不承诺跨变更快照游标。get 校验文件，search 只读清单而不全量读图；路径是查询时的位置，后续外部删除会使其失效。
+
+### 4.4 WebP 预览
+
+`get <id>` 始终返回经过完整性校验的原图路径，不改变 GIF、WebP 或其他格式的原始字节。显式传入 `--preview` 时，CLI 仅为静态 WebP 在 `.sticker/previews/<sha256>.png` 生成或复用 PNG 预览，并在结果中返回 `preview_path`；生成过程使用有界读取和原子文件提交，不写回标准 manifest。动画 WebP 或无法解码的文件返回 `integrity/invalid_image` 或 `validation/unsupported_format`，同时保留原图可读取路径。客户端应优先展示 `preview_path`，需要动画时使用原图 `path`。
+
+### 4.5 一键初始化与发布安装
+
+`setup` 是对正式安装流程的 convenience 包装，不引入第二套状态或下载逻辑。未传 `--pack` 时使用 `curated`；只有显式传入 `--pack all` 才安装全量。它透传 `--source` 和 `--dry-run`，返回与 `packs install` 相同的修订、计数和字节字段，并额外标记 `setup:true`。命令帮助必须指向正式的 `packs install`，不能让 Agent 依赖隐式默认全量。
+
+Release 为每个支持的平台提供版本固定的归档、`checksums.txt`，以及 Unix shell 和 Windows PowerShell 安装入口。入口识别 OS/架构，默认写入用户可写目录，不要求 sudo；下载后先校验 SHA-256，校验失败删除临时文件并以非零退出。二进制安装与素材安装分开：脚本不把图片打入归档，也不绕过 `packs install` 的包修订、dry-run 和本地源合同。安装入口支持显式版本，未指定版本使用发布页声明的稳定版本。
 
 ## 5. 用例与一致性
 
@@ -210,6 +243,14 @@ PATH 和 --id 二选一；--id 读取安装或个人清单中的原图。传 --c
 
 导出只选择个人 manifest 中的条目，复制到目标同级临时目录并校验，最后发布到尚不存在的目标目录；目标创建竞争也必须拒绝覆盖。产物为标准 manifest、emoticons，并附 packs.json 方便作为包安装。失败不留下完整目标目录；源数据不变。
 
+### 5.5 收藏整理
+
+分组命令只修改 `.sticker/collections.json`，图片和标准个人 `manifest.json` 仍是独立事实来源。创建、重命名和删除分组均在写锁内校验；默认 `favorites` 分组不可删除，删除自定义分组时必须显式选择将条目移入默认分组或一并移除收藏关系。后者只移除个人条目，不回收仍被其他包或分组引用的原图。
+
+`favorites organize` 支持一次请求中的加入、移出、移动到另一分组和手动重排；`--dry-run` 只返回计划。命令先解析并验证全部 ID、分组和顺序是否唯一，再使用临时文件加 fsync 原子替换元数据。任一无效 ID、重复顺序或并发版本变化都返回稳定冲突/校验错误，旧元数据保持可读。
+
+`favorites list --sort manual|added|caption|md5` 先按分组成员过滤，再排序和分页。排序结果只返回条目 ID、描述、格式、大小、来源和绝对路径，不包含原图字节。导出时复制标准清单和原图，并在同级临时目录写入可选 `collections.json`；导入缺少该扩展时建立默认分组，扩展校验失败则整体拒绝，不污染已有收藏。
+
 ## 6. 网络、边界与隐私
 
 HTTPS 必须验证证书；仅允许 HTTPS 重定向，最多 5 跳；不转发认证头（本 CLI 不支持远端认证配置）。单次 HTTP 超时 60 秒，单图总预算 180 秒。只对 GET 的临时网络故障、429、502/503/504 最多重试 2 次（总 3 次），退避 1/2 秒，Retry-After 最多等待 10 秒且可取消。验证失败、其他 4xx 和路径错误不重试。
@@ -232,12 +273,12 @@ HTTPS 必须验证证书；仅允许 HTTPS 重定向，最多 5 跳；不转发�
 
 | 测试组 | 覆盖 | 必测场景 |
 | --- | --- | --- |
-| T01 | US-001 | 二进制无运行依赖、version、零素材安装、各平台 PATH/原生 smoke 与校验文件 |
+| T01 | US-001；FR-25 | 二进制无运行依赖、version、零素材安装、各平台 PATH/原生 smoke、归档/校验文件、校验失败和无需 sudo 安装入口 |
 | T02 | US-002；FR-11–13 | help/schema/真实参数一致；未知参数；默认 JSON、table；stdout/stderr 与退出码；输出上限 |
 | T03 | US-003；FR-17 | 官方/自定义/本地目录、零图片请求、缓存过期时间、离线空缓存错误、安装状态 |
-| T04 | US-004；FR-1–4/14/16 | 精选请求白名单、全量内容复用、两次安装零新增字节、dry-run 零写入、修订变化、失败恢复 |
+| T04 | US-004；FR-1–4/14/16/24 | 精选请求白名单、全量内容复用、两次安装零新增字节、setup 默认精选且 all 显式、dry-run 零写入、修订变化、失败恢复 |
 | T05 | US-005；FR-5/18 | 包与收藏交集、去重、caption 优先级、大小写、空结果、分页边界、离线与性能 |
-| T06 | US-006；FR-6/16 | 缺图、损坏、绝对路径、GIF 字节未变；真实客户端静态/动画展示记录 |
+| T06 | US-006；FR-6/16/23 | 缺图、损坏、绝对路径、GIF 字节未变；静态 WebP 预览生成且原图哈希不变；真实客户端静态/动画展示记录 |
 | T07 | US-007；FR-7/8/14 | PATH/ID 互斥、空描述与未传区别、删除源文件、去重与冲突、标准格式可读、失败不缺图 |
 | T08 | US-008；FR-7/8/14 | 列表、describe、重复 remove、dry-run、并发修改、已安装图片不受影响 |
 | T09 | US-009；FR-9/14/15 | 无 packs.json 导入、旧 collection、原图缺失/超限/越界、零部分清单提交、覆盖策略、源目录移走 |
@@ -246,22 +287,27 @@ HTTPS 必须验证证书；仅允许 HTTPS 重定向，最多 5 跳；不转发�
 | T12 | US-012；FR-1/16 | 原图唯一、精选子集、计数/哈希、v1 兼容、改名链接、画面描述复核 |
 | T13 | US-013 | Skill 指令与 CLI 一致、不覆盖已有指引、真实 Agent 端到端，平台限制如实报告 |
 | T14 | FR-4/7/15；横切 | 原子替换故障注入、并发进程、磁盘满、取消前后、Windows reparse、symlink/TOCTOU、锁释放 |
+| T15 | US-013 | Skill 指令与 CLI 一致、不覆盖已有指引、真实 Agent 端到端，平台限制如实报告 |
+| T16 | US-014；FR-19 | 创建/重命名/删除分组、成员引用校验、缺失扩展回退默认分组、旧 v1 清单兼容、损坏元数据不覆盖有效数据 |
+| T17 | US-015；FR-20/21 | 分组筛选、四种稳定排序、批量移动/重排/取消、dry-run、无效 ID 整体失败、并发原子提交 |
+| T18 | US-016；FR-22/24 | 临时目录与本地 fixture 完成 setup 精选安装、离线搜索、原图读取、清单导入、分组创建/排序/批量整理；显式本地素材源、精选不访问全量独有文件、损坏哈希和元数据失败且不发布不完整状态；CI 无外部服务并可重复运行 |
 
 每个实现 Issue 跑相关回归、go test、vet 与 lint；并发/文件提交跑 race 和平台测试。文档阶段只检查映射、示例、链接与差异；当前尚未执行产品验收。
 
 ## 9. 实施顺序
 
-依赖与具体 Issue 草案见 [实施任务清单](issues-emoticon-cli.md)。该文件使用本地编号 I01…，不是 GitHub Issue 编号。
+依赖与具体 Issue 草案见 [实施任务清单](issues-sticker-cli.md)。该文件使用本地编号 I01…，不是 GitHub Issue 编号。
 
-P1：Go 基础 → 标准素材库 I/O → 素材目录/包发现 → 安装/搜索/原图读取 → 原图与清单导入 → 分发及 Agent 验收。
-P2：收藏管理、导出与包更新卸载。可以在依赖满足后独立开发，但本轮不派发实施。
+P1：Go 基础 → 标准素材库 I/O → 素材目录/包发现 → 安装/搜索/原图读取 → 原图与清单导入 → 收藏分组与整理 → setup convenience → 分发及 Agent 验收 → 自动化端到端回归。
+P2：收藏描述、导出与包更新卸载。可以在依赖满足后独立开发，但本轮不派发实施。
 
 ## 10. 已决事项与剩余风险
 
-- PRD 已确认命名建议：CLI emoticon-cli，命令 emoticon，素材 agent-emoticon-packs；远端素材仓库重命名仍作为素材迁移步骤执行。
+- PRD 已确认命名：CLI sticker-cli，命令 sticker，素材 sticker-ext；远端仓库重命名随各自迁移步骤执行。
 - 不另建 favorites 专有清单；根目录个人 manifest 与公共包清单具有同一种 v1 格式。
+- 分组与排序写入 `.sticker/collections.json` 扩展；标准 v1 清单和原图仍是跨客户端交换格式。
 - 首版不自动释放卸载包占用的原图空间；这是保护共享素材的明确范围选择，命令必须报告。
-- 精选候选 124 张需画面复核，当前只有既有描述筛选与全库文件校验结果。
+- 精选清单当前为 120 张，已完成逐张画面复核；后续变更仍需按清单重新校验。
 - Windows 原子替换与路径边界必须在 Windows 原生测试，不能用 Unix 行为代替。
 - 代码许可证尚需在首次代码发布前确定；不影响本轮技术设计，不能给素材自动套用代码许可证。
 
