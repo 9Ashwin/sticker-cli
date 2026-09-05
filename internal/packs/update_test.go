@@ -40,6 +40,11 @@ func TestUpdateUsesSavedSourceAndPreservesPersonalManifest(t *testing.T) {
 	manifestBytes := writeUpdatedPackFixture(t, fixture, []library.Item{changedItem, newItem}, [][]byte{nil, []byte("GIF89a update fixture")})
 	newRevision := hashText(manifestBytes)
 
+	stagingDir := filepath.Join(home, ".sticker", "staging")
+	beforeStaging, err := os.ReadDir(stagingDir)
+	if err != nil {
+		t.Fatal(err)
+	}
 	plan, err := PlanUpdate(context.Background(), UpdateOptions{Home: home, PackID: "curated"})
 	if err != nil {
 		t.Fatal(err)
@@ -47,12 +52,12 @@ func TestUpdateUsesSavedSourceAndPreservesPersonalManifest(t *testing.T) {
 	if plan.Source != fixture.root || plan.Revision != newRevision || plan.Added != 1 || plan.Reused != 1 || plan.DownloadBytes != newItem.Size {
 		t.Fatalf("unexpected update plan: %+v", plan)
 	}
-	stagingEntries, err := os.ReadDir(filepath.Join(home, ".sticker", "staging"))
+	afterStaging, err := os.ReadDir(stagingDir)
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		t.Fatal(err)
 	}
-	if len(stagingEntries) != 0 {
-		t.Fatalf("dry-run planning created staging files: %v", stagingEntries)
+	if len(afterStaging) != len(beforeStaging) {
+		t.Fatalf("dry-run planning changed staging files: before=%v after=%v", beforeStaging, afterStaging)
 	}
 
 	result, err := Update(context.Background(), UpdateOptions{Home: home, PackID: "curated"})

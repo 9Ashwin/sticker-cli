@@ -209,7 +209,7 @@ func Install(ctx context.Context, options InstallOptions) (InstallResult, error)
 		Revision: plan.Revision,
 	}
 
-	stagingRoot, staged, downloaded, err := stageMissingImages(ctx, prepared, options.HTTPClient, options.Backoff)
+	_, staged, downloaded, err := stageMissingImages(ctx, prepared, options.HTTPClient, options.Backoff)
 	if err != nil {
 		return InstallResult{}, err
 	}
@@ -218,9 +218,6 @@ func Install(ctx context.Context, options InstallOptions) (InstallResult, error)
 	result, err = publishInstall(ctx, prepared, staged, result, options.Now)
 	if err != nil {
 		return InstallResult{}, err
-	}
-	if stagingRoot != "" {
-		_ = os.RemoveAll(stagingRoot)
 	}
 	return result, nil
 }
@@ -237,6 +234,10 @@ func createStagingDirectory(root *library.Library) (string, error) {
 	return path, nil
 }
 
+// stageMissingImages leaves the completed staging directory in place. It is
+// content-verified and can be reused by a later retry; avoiding path-based
+// recursive cleanup also keeps a post-publish symlink swap from redirecting
+// deletion outside the library root.
 func stageMissingImages(ctx context.Context, prepared preparedInstall, client *http.Client, backoff func(context.Context, time.Duration) error) (string, map[string]stagedImage, int64, error) {
 	stagingRoot, err := createStagingDirectory(prepared.root)
 	if err != nil {
@@ -373,7 +374,7 @@ func Update(ctx context.Context, options UpdateOptions) (UpdateResult, error) {
 		Pack:     plan.Pack,
 		Revision: plan.Revision,
 	}
-	stagingRoot, staged, downloaded, err := stageMissingImages(ctx, prepared.prepared, options.HTTPClient, options.Backoff)
+	_, staged, downloaded, err := stageMissingImages(ctx, prepared.prepared, options.HTTPClient, options.Backoff)
 	if err != nil {
 		return UpdateResult{}, err
 	}
@@ -381,9 +382,6 @@ func Update(ctx context.Context, options UpdateOptions) (UpdateResult, error) {
 	result, err = publishUpdate(ctx, prepared, staged, result, options.Now)
 	if err != nil {
 		return UpdateResult{}, err
-	}
-	if stagingRoot != "" {
-		_ = os.RemoveAll(stagingRoot)
 	}
 	return result, nil
 }
@@ -822,16 +820,20 @@ func checkPersonalConflicts(personal library.Manifest, selected library.Manifest
 }
 
 func readInstalledState(home, id string) (installedState, bool, error) {
-	path := filepath.Join(home, ".sticker", "packs", id+".json")
-	if _, err := os.Lstat(path); errors.Is(err, os.ErrNotExist) {
-		return installedState{}, false, nil
-	} else if err != nil {
-		return installedState{}, false, wrapError("io", "read_failed", "cannot inspect installed pack state", "Check the local pack state permissions.", err)
-	}
 	relative := filepath.ToSlash(filepath.Join(".sticker", "packs", id+".json"))
-	data, err := readHomeFile(home, relative, maxCacheBytes)
+	data, err := library.ReadRelative(context.Background(), home, relative, maxCacheBytes)
+	if errors.Is(err, os.ErrNotExist) {
+		return installedState{}, false, nil
+	}
 	if err != nil {
-		return installedState{}, false, err
+		var libraryErr *library.Error
+		if errors.As(err, &libraryErr) {
+			if libraryErr.Kind == "integrity" {
+				return installedState{}, false, invalidInstalledState(id, libraryErr.Message)
+			}
+			return installedState{}, false, fromLibraryError(err)
+		}
+		return installedState{}, false, wrapError("io", "read_failed", "cannot read installed pack state", "Check the local pack state permissions.", err)
 	}
 	var state installedState
 	if err := decodeStrict(data, &state); err != nil {

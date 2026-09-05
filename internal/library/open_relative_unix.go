@@ -43,6 +43,9 @@ func openRelativeNoFollow(root, relative string) (*os.File, error) {
 		}
 		nextFD, openErr := unix.Openat(currentFD, part, flags, 0)
 		if openErr != nil {
+			if errors.Is(openErr, unix.ELOOP) {
+				return nil, errorf("validation", "unsafe_path", "Remove links from the library path.", "path component is a symbolic link")
+			}
 			return nil, openErr
 		}
 		_ = unix.Close(currentFD)
