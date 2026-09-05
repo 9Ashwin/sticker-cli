@@ -3,6 +3,7 @@
 package library
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -39,10 +40,15 @@ func openRelativeNoFollow(root, relative string) (*os.File, error) {
 }
 
 func finalPath(file *os.File) (string, error) {
-	buffer := make([]uint16, 32768)
-	length, _, err := getFinalPathProc.Call(file.Fd(), uintptr(unsafe.Pointer(&buffer[0])), uintptr(len(buffer)))
-	if length == 0 {
-		return "", err
+	for size := 256; size <= 65536; size *= 2 {
+		buffer := make([]uint16, size)
+		length, _, err := getFinalPathProc.Call(file.Fd(), uintptr(unsafe.Pointer(&buffer[0])), uintptr(len(buffer)), 0)
+		if length == 0 {
+			return "", err
+		}
+		if length < uintptr(len(buffer)-1) {
+			return syscall.UTF16ToString(buffer[:length]), nil
+		}
 	}
-	return syscall.UTF16ToString(buffer[:length]), nil
+	return "", errors.New("final path exceeds supported Windows path length")
 }
