@@ -715,17 +715,6 @@ func structuredHelp(command *cobra.Command, options *rootOptions) error {
 	return writeResult(command, options, map[string]string{"help": helpText}, false)
 }
 
-func placeholder(_ *cobra.Command, path string) error {
-	return &cliError{
-		Type:      "internal",
-		Subtype:   "unimplemented",
-		Message:   path + " is not implemented yet",
-		Hint:      "Use schema or --help to inspect the command contract.",
-		ExitCode:  1,
-		Retryable: false,
-	}
-}
-
 func normalizeError(ctx context.Context, err error) error {
 	if err == nil {
 		return nil
