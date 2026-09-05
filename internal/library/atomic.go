@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"os"
+	"path/filepath"
 )
 
 func (l *Library) atomicReplace(ctx context.Context, target string, data []byte) error {
@@ -19,13 +20,31 @@ func (l *Library) atomicReplace(ctx context.Context, target string, data []byte)
 	return atomicReplacePlatform(ctx, target, data, l.Hooks)
 }
 
+// WriteRelativeAtomic publishes data at a path beneath the library root.
+// Parent directories must already exist. The platform implementation anchors
+// the write to the library root so a concurrent symlink swap cannot redirect
+// the temporary file or rename outside the library.
+func (l *Library) WriteRelativeAtomic(ctx context.Context, relative string, data []byte) error {
+	path, err := l.rootPath(filepath.FromSlash(relative))
+	if err != nil {
+		return err
+	}
+	return l.writeRelativeAtomic(ctx, relative, path, data)
+}
+
 func finishAtomicRename(target, directory string, hooks Hooks) error {
+	return finishAtomicRenameWith(target, directory, hooks, func() error {
+		return syncDirectory(directory)
+	})
+}
+
+func finishAtomicRenameWith(target, directory string, hooks Hooks, sync func() error) error {
 	if hooks.AfterRename != nil {
 		if err := hooks.AfterRename(target); err != nil {
 			return &Error{Kind: "io", Subtype: "write_failed", Message: "manifest was committed but directory synchronization failed", Hint: "Read the manifest again before retrying.", Err: err, Committed: true}
 		}
 	}
-	if err := syncDirectory(directory); err != nil {
+	if err := sync(); err != nil {
 		return &Error{Kind: "io", Subtype: "write_failed", Message: "manifest was committed but directory synchronization failed", Hint: "Read the manifest again before retrying.", Err: err, Committed: true}
 	}
 	if hooks.SyncDirectory != nil {

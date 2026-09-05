@@ -180,39 +180,23 @@ func writeCache(ctx context.Context, root, relative string, data []byte) error {
 	if err := ensurePreviewDirectory(root); err != nil {
 		return err
 	}
-	directory := filepath.Join(root, filepath.FromSlash(previewDirectory))
-	temporary, err := os.CreateTemp(directory, ".preview-*.tmp")
+	rootLibrary, err := library.New(root)
 	if err != nil {
-		return previewError("io", "write_failed", "Choose a writable local data directory.", "cannot create the preview cache")
+		return previewError("validation", "unsafe_path", "Choose a local data directory.", "cannot open the preview library")
 	}
-	temporaryName := temporary.Name()
-	removeTemporary := true
-	defer func() {
-		_ = temporary.Close()
-		if removeTemporary {
-			_ = os.Remove(temporaryName)
+	if err := rootLibrary.WriteRelativeAtomic(ctx, relative, data); err != nil {
+		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+			return previewError("cancelled", "interrupted", "Retry the operation when ready.", "preview write cancelled")
 		}
-	}()
-	if err := temporary.Chmod(0o600); err != nil {
-		return previewError("io", "write_failed", "Choose a writable local data directory.", "cannot protect the preview cache")
-	}
-	if _, err := temporary.Write(data); err != nil {
-		return previewError("io", "write_failed", "Check available disk space.", "cannot write the preview cache")
-	}
-	if err := temporary.Sync(); err != nil {
-		return previewError("io", "write_failed", "Check available disk space.", "cannot sync the preview cache")
-	}
-	if err := temporary.Close(); err != nil {
-		return previewError("io", "write_failed", "Retry the operation.", "cannot close the preview cache")
-	}
-	target := filepath.Join(root, filepath.FromSlash(relative))
-	if err := os.Rename(temporaryName, target); err != nil {
+		var libraryErr *library.Error
+		if errors.As(err, &libraryErr) && libraryErr.Kind == "validation" {
+			return previewError("validation", libraryErr.Subtype, "Remove links from the local data directory.", "preview cache path is unsafe")
+		}
 		if cached, cacheErr := readCache(ctx, root, relative); cacheErr == nil && cached {
 			return nil
 		}
 		return previewError("io", "write_failed", "Choose a writable local data directory.", "cannot publish the preview cache")
 	}
-	removeTemporary = false
 	return nil
 }
 
