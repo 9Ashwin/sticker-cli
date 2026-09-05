@@ -44,3 +44,82 @@ func runFavoriteAdd(ctx context.Context, cmd *cobra.Command, options *rootOption
 	}
 	return writeResult(cmd, options, result, false)
 }
+
+func runFavoriteList(ctx context.Context, cmd *cobra.Command, options *rootOptions) error {
+	home, err := resolveHome(options)
+	if err != nil {
+		return err
+	}
+	collection, err := cmd.Flags().GetString("collection")
+	if err != nil {
+		return err
+	}
+	sortOrder, err := cmd.Flags().GetString("sort")
+	if err != nil {
+		return err
+	}
+	limit, err := cmd.Flags().GetInt("limit")
+	if err != nil {
+		return err
+	}
+	offset, err := cmd.Flags().GetInt("offset")
+	if err != nil {
+		return err
+	}
+	result, err := stickerfavorites.List(ctx, stickerfavorites.ListOptions{
+		Home:       home,
+		Collection: collection,
+		Sort:       sortOrder,
+		Limit:      limit,
+		Offset:     offset,
+	})
+	if err != nil {
+		return err
+	}
+	return writeSearchResult(cmd, options, result)
+}
+
+func runFavoriteDescribe(ctx context.Context, cmd *cobra.Command, options *rootOptions, id string) error {
+	home, err := resolveHome(options)
+	if err != nil {
+		return err
+	}
+	caption, err := cmd.Flags().GetString("caption")
+	if err != nil {
+		return err
+	}
+	dryRun, err := cmd.Flags().GetBool("dry-run")
+	if err != nil {
+		return err
+	}
+	result, err := stickerfavorites.Describe(ctx, stickerfavorites.DescribeOptions{
+		Home:    home,
+		ID:      id,
+		Caption: caption,
+		DryRun:  dryRun,
+	})
+	if err != nil {
+		return err
+	}
+	return writeResult(cmd, options, result, false)
+}
+
+func runFavoriteRemove(ctx context.Context, cmd *cobra.Command, options *rootOptions, ids []string) error {
+	home, err := resolveHome(options)
+	if err != nil {
+		return err
+	}
+	dryRun, err := cmd.Flags().GetBool("dry-run")
+	if err != nil {
+		return err
+	}
+	result, err := stickerfavorites.Remove(ctx, stickerfavorites.RemoveOptions{
+		Home:   home,
+		IDs:    ids,
+		DryRun: dryRun,
+	})
+	if err != nil {
+		return err
+	}
+	return writeResult(cmd, options, result, false)
+}

@@ -1,0 +1,186 @@
+package favorites
+
+import (
+	"context"
+	"os"
+	"path/filepath"
+	"sync"
+	"testing"
+
+	"github.com/9Ashwin/sticker-cli/internal/library"
+)
+
+func addTestFavorite(t *testing.T, home, name, caption string) library.Item {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), name+".gif")
+	if err := os.WriteFile(path, []byte("GIF89a-"+name), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	var captionPtr *string
+	if caption != "" {
+		captionPtr = &caption
+	}
+	result, err := Execute(context.Background(), Options{Home: home, Path: path, Caption: captionPtr})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return library.Item{MD5: result.Item.MD5, SHA256: result.Item.SHA256, Filename: result.Item.Filename, Format: result.Item.Format, Size: result.Item.Size, Caption: result.Item.Caption}
+}
+
+func TestListPaginatesPersonalManifestAndSortsCaptions(t *testing.T) {
+	home := filepath.Join(t.TempDir(), "home")
+	addTestFavorite(t, home, "one", "zebra")
+	addTestFavorite(t, home, "two", "Alpha")
+	addTestFavorite(t, home, "three", "beta")
+
+	page, err := List(context.Background(), ListOptions{Home: home, Sort: "caption", Limit: 2})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if page.Total != 3 || len(page.Items) != 2 || !page.HasMore || page.NextOffset != 2 {
+		t.Fatalf("unexpected first page: %+v", page)
+	}
+	if page.Items[0].Caption != "Alpha" || page.Items[1].Caption != "beta" {
+		t.Fatalf("caption ordering = %q, %q", page.Items[0].Caption, page.Items[1].Caption)
+	}
+	for _, item := range page.Items {
+		if !item.Favorite || !filepath.IsAbs(item.Path) || item.Packs == nil {
+			t.Fatalf("incomplete list item: %+v", item)
+		}
+	}
+
+	page, err = List(context.Background(), ListOptions{Home: home, Sort: "caption", Limit: 2, Offset: 2})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if page.Total != 3 || len(page.Items) != 1 || page.HasMore || page.NextOffset != 3 || page.Items[0].Caption != "zebra" {
+		t.Fatalf("unexpected second page: %+v", page)
+	}
+
+	page, err = List(context.Background(), ListOptions{Home: home, Sort: "md5", Limit: 2, Offset: 10})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if page.Total != 3 || len(page.Items) != 0 || page.HasMore || page.NextOffset != 10 {
+		t.Fatalf("unexpected empty page: %+v", page)
+	}
+}
+
+func TestDescribeSupportsDryRunAndExplicitEmptyCaption(t *testing.T) {
+	home := filepath.Join(t.TempDir(), "home")
+	item := addTestFavorite(t, home, "describe", "old")
+
+	dryRun, err := Describe(context.Background(), DescribeOptions{Home: home, ID: item.MD5, Caption: "new", DryRun: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !dryRun.Updated || !dryRun.DryRun || dryRun.Item.Caption != "new" {
+		t.Fatalf("unexpected dry-run result: %+v", dryRun)
+	}
+	root, err := library.New(home)
+	if err != nil {
+		t.Fatal(err)
+	}
+	manifest, err := root.ReadManifest(context.Background())
+	if err != nil || manifest.Items[0].Caption != "old" {
+		t.Fatalf("dry-run changed manifest: %+v %v", manifest, err)
+	}
+
+	updated, err := Describe(context.Background(), DescribeOptions{Home: home, ID: item.MD5, Caption: "new"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !updated.Updated || updated.DryRun || updated.Item.Caption != "new" {
+		t.Fatalf("unexpected update result: %+v", updated)
+	}
+	cleared, err := Describe(context.Background(), DescribeOptions{Home: home, ID: item.MD5, Caption: ""})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !cleared.Updated || cleared.Item.Caption != "" {
+		t.Fatalf("unexpected clear result: %+v", cleared)
+	}
+}
+
+func TestRemoveIsIdempotentAndRetainsOriginal(t *testing.T) {
+	home := filepath.Join(t.TempDir(), "home")
+	item := addTestFavorite(t, home, "remove", "keep")
+	root, err := library.New(home)
+	if err != nil {
+		t.Fatal(err)
+	}
+	path, err := root.ItemPath(item)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	dryRun, err := Remove(context.Background(), RemoveOptions{Home: home, IDs: []string{item.MD5}, DryRun: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if dryRun.Removed != 1 || dryRun.RetainedOriginal != 1 || !dryRun.DryRun || dryRun.Committed {
+		t.Fatalf("unexpected remove dry-run: %+v", dryRun)
+	}
+	if _, err := os.Stat(path); err != nil {
+		t.Fatalf("dry-run removed original: %v", err)
+	}
+
+	removed, err := Remove(context.Background(), RemoveOptions{Home: home, IDs: []string{item.MD5, item.MD5}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if removed.Removed != 1 || removed.RetainedOriginal != 1 || !removed.Committed {
+		t.Fatalf("unexpected remove result: %+v", removed)
+	}
+	if _, err := os.Stat(path); err != nil {
+		t.Fatalf("remove deleted original: %v", err)
+	}
+	second, err := Remove(context.Background(), RemoveOptions{Home: home, IDs: []string{item.MD5}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if second.Removed != 0 || second.RetainedOriginal != 0 || second.Committed {
+		t.Fatalf("repeat remove is not idempotent: %+v", second)
+	}
+	manifest, err := root.ReadManifest(context.Background())
+	if err != nil || len(manifest.Items) != 0 {
+		t.Fatalf("removed item remains in manifest: %+v %v", manifest, err)
+	}
+}
+
+func TestConcurrentDescribeUpdatesKeepBothCaptions(t *testing.T) {
+	home := filepath.Join(t.TempDir(), "home")
+	first := addTestFavorite(t, home, "first", "one")
+	second := addTestFavorite(t, home, "second", "two")
+
+	var group sync.WaitGroup
+	group.Add(2)
+	var firstErr, secondErr error
+	go func() {
+		defer group.Done()
+		_, firstErr = Describe(context.Background(), DescribeOptions{Home: home, ID: first.MD5, Caption: "updated one"})
+	}()
+	go func() {
+		defer group.Done()
+		_, secondErr = Describe(context.Background(), DescribeOptions{Home: home, ID: second.MD5, Caption: "updated two"})
+	}()
+	group.Wait()
+	if firstErr != nil || secondErr != nil {
+		t.Fatalf("concurrent describes failed: %v / %v", firstErr, secondErr)
+	}
+	root, err := library.New(home)
+	if err != nil {
+		t.Fatal(err)
+	}
+	manifest, err := root.ReadManifest(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := make(map[string]string, len(manifest.Items))
+	for _, item := range manifest.Items {
+		got[item.MD5] = item.Caption
+	}
+	if got[first.MD5] != "updated one" || got[second.MD5] != "updated two" {
+		t.Fatalf("concurrent captions lost: %v", got)
+	}
+}
