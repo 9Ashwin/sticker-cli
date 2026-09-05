@@ -244,7 +244,7 @@ func favoriteAddMetadata() commandMetadata {
 			{Name: "caption", Type: "string", Description: "Personal caption"},
 			{Name: "dry-run", Type: "bool", Default: false, Description: "Validate without writing"},
 		},
-		Result:   objectSchema("item", "object", "added", "bool", "updated", "bool"),
+		Result:   objectSchema("item", "object", "added", "bool", "updated", "bool", "dry_run", "bool"),
 		Errors:   defaultErrors(),
 		Examples: []string{"sticker favorites add ./reaction.gif --caption '收到'", "sticker favorites add --id 0123456789abcdef0123456789abcdef"},
 		Args:     cobra.MaximumNArgs(1),

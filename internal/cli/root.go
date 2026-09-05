@@ -266,7 +266,7 @@ func registerCommands(root *cobra.Command, registry *commandRegistry, options *r
 		if err := validateFavoriteAdd(cmd, args); err != nil {
 			return err
 		}
-		return placeholder(cmd, "favorites add")
+		return runFavoriteAdd(cmd.Context(), cmd, options, args)
 	})
 	addFavoriteCommand(favorites.Command, registry, favoriteListMetadata(), func(cmd *cobra.Command, _ []string) error {
 		if err := validateFavoriteList(cmd); err != nil {
