@@ -7,11 +7,16 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"sync"
 	"syscall"
 	"time"
 )
 
-type fileLock struct{ file *os.File }
+type fileLock struct {
+	file *os.File
+	once sync.Once
+	err  error
+}
 
 func acquireLock(ctx context.Context, root string, exclusive bool, timeout time.Duration) (*fileLock, error) {
 	if err := ctx.Err(); err != nil {
@@ -72,11 +77,15 @@ func (l *fileLock) Close() error {
 	if l == nil || l.file == nil {
 		return nil
 	}
-	if err := syscall.Flock(int(l.file.Fd()), syscall.LOCK_UN); err != nil {
-		_ = l.file.Close()
-		return err
-	}
-	return l.file.Close()
+	l.once.Do(func() {
+		if err := syscall.Flock(int(l.file.Fd()), syscall.LOCK_UN); err != nil {
+			l.err = err
+		}
+		if closeErr := l.file.Close(); l.err == nil {
+			l.err = closeErr
+		}
+	})
+	return l.err
 }
 
 func ensureLockDirectory(path string) error {

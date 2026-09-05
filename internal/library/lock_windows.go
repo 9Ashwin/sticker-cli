@@ -7,6 +7,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"sync"
 	"syscall"
 	"time"
 	"unsafe"
@@ -26,6 +27,8 @@ var (
 type fileLock struct {
 	file    *os.File
 	overlap syscall.Overlapped
+	once    sync.Once
+	err     error
 }
 
 func acquireLock(ctx context.Context, root string, exclusive bool, timeout time.Duration) (*fileLock, error) {
@@ -88,12 +91,16 @@ func (l *fileLock) Close() error {
 	if l == nil || l.file == nil {
 		return nil
 	}
-	_, _, err := unlockFileExProc.Call(l.file.Fd(), 0, 0, 1, 0, uintptr(unsafe.Pointer(&l.overlap)))
-	closeErr := l.file.Close()
-	if err != syscall.Errno(0) {
-		return err
-	}
-	return closeErr
+	l.once.Do(func() {
+		_, _, unlockErr := unlockFileExProc.Call(l.file.Fd(), 0, 1, 0, uintptr(unsafe.Pointer(&l.overlap)))
+		if unlockErr != syscall.Errno(0) {
+			l.err = unlockErr
+		}
+		if closeErr := l.file.Close(); l.err == nil {
+			l.err = closeErr
+		}
+	})
+	return l.err
 }
 
 func ensureLockDirectory(path string) error {

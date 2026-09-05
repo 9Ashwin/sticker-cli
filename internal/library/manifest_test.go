@@ -63,7 +63,7 @@ func TestExistingCorruptManifestIsNotEmpty(t *testing.T) {
 	if !errors.As(err, &coded) || coded.Kind != "integrity" || coded.Subtype != "invalid_manifest" {
 		t.Fatalf("got %T %v", err, err)
 	}
-	if err := library.WriteManifest(context.Background(), Manifest{SchemaVersion: 1, Collection: "personal"}); err == nil {
+	if err := library.WriteManifest(context.Background(), Manifest{SchemaVersion: 1, Collection: "personal", Items: []Item{}}); err == nil {
 		t.Fatal("corrupt target was silently replaced")
 	}
 }
@@ -81,6 +81,33 @@ func TestManifestRejectsDuplicateKeysAndUnsafeFilename(t *testing.T) {
 	item := Item{MD5: "0123456789abcdef0123456789abcdef", SHA256: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", Filename: "../escape.gif", Format: "gif", Size: 1}
 	if err := ValidateManifest(Manifest{SchemaVersion: 1, Collection: "personal", Items: []Item{item}}, Limits{}); err == nil {
 		t.Fatal("unsafe filename accepted")
+	}
+}
+
+func TestManifestRequiresItemsArray(t *testing.T) {
+	for _, raw := range []string{
+		`{"schema_version":1,"collection":"personal"}`,
+		`{"schema_version":1,"collection":"personal","items":null}`,
+	} {
+		root := t.TempDir()
+		if err := os.WriteFile(filepath.Join(root, ManifestName), []byte(raw), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		library, _ := New(root)
+		if _, err := library.ReadManifest(context.Background()); err == nil {
+			t.Fatalf("manifest without an items array was accepted: %s", raw)
+		}
+	}
+}
+
+func TestReadManifestCancellationIsStable(t *testing.T) {
+	library, _ := New(t.TempDir())
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	_, err := library.ReadManifest(ctx)
+	var coded *Error
+	if !errors.As(err, &coded) || coded.Kind != "cancelled" || coded.Subtype != "interrupted" {
+		t.Fatalf("unexpected cancellation error: %v", err)
 	}
 }
 
@@ -142,7 +169,7 @@ func TestWriteCancellationAndCommittedAfterError(t *testing.T) {
 		t.Fatal("cancelled write succeeded")
 	}
 	library.Hooks.AfterRename = func(string) error { return errors.New("simulated directory sync failure") }
-	err := library.WriteManifest(context.Background(), Manifest{SchemaVersion: 1, Collection: "personal"})
+	err := library.WriteManifest(context.Background(), Manifest{SchemaVersion: 1, Collection: "personal", Items: []Item{}})
 	var coded *Error
 	if !errors.As(err, &coded) || !coded.Committed {
 		t.Fatalf("post-commit error did not report committed state: %v", err)
@@ -163,6 +190,12 @@ func TestLockCancellation(t *testing.T) {
 	cancel()
 	if _, err := acquireLock(ctx, root, true, time.Second); err == nil {
 		t.Fatal("cancelled lock acquisition succeeded")
+	}
+	if err := first.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := first.Close(); err != nil {
+		t.Fatalf("lock close is not idempotent: %v", err)
 	}
 }
 

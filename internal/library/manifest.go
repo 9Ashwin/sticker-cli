@@ -104,6 +104,9 @@ func ValidateManifest(manifest Manifest, limits Limits) error {
 	if manifest.Collection == "" || !utf8.ValidString(manifest.Collection) {
 		return errorf("integrity", "invalid_manifest", "Set a non-empty collection name.", "manifest collection is invalid")
 	}
+	if manifest.Items == nil {
+		return errorf("integrity", "invalid_manifest", "Set items to a JSON array.", "manifest items field is missing or null")
+	}
 	if len(manifest.Items) > limits.Items {
 		return errorf("integrity", "invalid_manifest", "Reduce the manifest to the supported item limit.", "manifest contains %d items; maximum is %d", len(manifest.Items), limits.Items)
 	}
@@ -170,11 +173,14 @@ func (l *Library) readManifestUnlocked(ctx context.Context) (Manifest, error) {
 	if err := rejectExistingSymlink(path); err != nil {
 		return Manifest{}, err
 	}
-	data, err := readBounded(ctx, path, l.Limits.withDefaults().ManifestBytes)
+	data, err := readBoundedRelative(ctx, l.Root, ManifestName, l.Limits.withDefaults().ManifestBytes)
 	if errors.Is(err, os.ErrNotExist) {
 		return Manifest{SchemaVersion: 1, Collection: "personal", Items: []Item{}}, nil
 	}
 	if err != nil {
+		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+			return Manifest{}, errorf("cancelled", "interrupted", "Retry the operation when ready.", "manifest read cancelled")
+		}
 		return Manifest{}, wrapError("io", "read_failed", "Check the library manifest permissions.", err)
 	}
 	manifest, err := decodeManifest(data, l.Limits)
@@ -250,11 +256,19 @@ func (l *Library) ReadItem(ctx context.Context, id string) (Item, string, error)
 }
 
 func (l *Library) verifyItem(ctx context.Context, item Item) error {
-	path, err := l.itemPath(item)
+	_, err := l.itemPath(item)
 	if err != nil {
 		return err
 	}
-	return VerifyFile(ctx, path, item, l.Limits)
+	file, err := openRelativeNoFollow(l.Root, filepath.FromSlash(item.Filename))
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return errorf("integrity", "invalid_image", "Restore the missing image or remove its manifest entry.", "image %s is missing", item.MD5)
+		}
+		return wrapError("io", "read_failed", "Check the image permissions.", err)
+	}
+	defer func() { _ = file.Close() }()
+	return verifyFileHandle(ctx, file, item, l.Limits)
 }
 
 // VerifyFile validates one standard manifest item at an already resolved path.
@@ -271,6 +285,10 @@ func VerifyFile(ctx context.Context, path string, item Item, limits Limits) erro
 		return wrapError("io", "read_failed", "Check the image permissions.", err)
 	}
 	defer func() { _ = file.Close() }()
+	return verifyFileHandle(ctx, file, item, limits)
+}
+
+func verifyFileHandle(ctx context.Context, file *os.File, item Item, limits Limits) error {
 	md5Hash := md5.New()
 	shaHash := sha256.New()
 	reader := io.Reader(file)
@@ -301,7 +319,7 @@ func (l *Library) WriteManifest(ctx context.Context, manifest Manifest) error {
 	if err := ValidateManifest(manifest, l.Limits); err != nil {
 		return err
 	}
-	manifest.Items = append([]Item(nil), manifest.Items...)
+	manifest.Items = append([]Item{}, manifest.Items...)
 	sort.Slice(manifest.Items, func(i, j int) bool { return manifest.Items[i].MD5 < manifest.Items[j].MD5 })
 	data, err := json.MarshalIndent(manifest, "", "  ")
 	if err != nil {
@@ -353,7 +371,7 @@ func (l *Library) writeManifestUnlocked(ctx context.Context, manifest Manifest) 
 	if err := ValidateManifest(manifest, l.Limits); err != nil {
 		return err
 	}
-	manifest.Items = append([]Item(nil), manifest.Items...)
+	manifest.Items = append([]Item{}, manifest.Items...)
 	sort.Slice(manifest.Items, func(i, j int) bool { return manifest.Items[i].MD5 < manifest.Items[j].MD5 })
 	data, err := json.MarshalIndent(manifest, "", "  ")
 	if err != nil {

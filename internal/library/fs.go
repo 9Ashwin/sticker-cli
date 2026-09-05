@@ -101,8 +101,8 @@ func rejectSymlinkComponents(root, target string) error {
 	return nil
 }
 
-func readBounded(ctx context.Context, path string, limit int64) ([]byte, error) {
-	file, err := openNoFollow(path)
+func readBoundedRelative(ctx context.Context, root, relative string, limit int64) ([]byte, error) {
+	file, err := openRelativeNoFollow(root, relative)
 	if err != nil {
 		return nil, err
 	}
