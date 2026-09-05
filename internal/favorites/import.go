@@ -146,7 +146,7 @@ func prepareImport(ctx context.Context, options ImportOptions) (importPlan, erro
 		if err := contextError(ctx); err != nil {
 			return plan, err
 		}
-		existing, found := findItem(personal.Items, sourceItem.MD5)
+		existing, found := findImportItem(personal.Items, sourceItem.MD5)
 		if found && !sameContent(existing, sourceItem) {
 			plan.result.Conflicts++
 			plan.result.Failed++
@@ -243,7 +243,7 @@ func publishImport(ctx context.Context, plan importPlan, staging *library.Librar
 				actual.Failed++
 				return library.Manifest{}, err
 			}
-			existing, found := findItem(items, planned.source.MD5)
+			existing, found := findImportItem(items, planned.source.MD5)
 			if found && !sameContent(existing, planned.source) {
 				actual.Conflicts++
 				actual.Failed++
@@ -326,7 +326,7 @@ func publishStagedItem(ctx context.Context, target, staging *library.Library, it
 	return target.VerifyItem(ctx, item)
 }
 
-func findItem(items []library.Item, md5 string) (library.Item, bool) {
+func findImportItem(items []library.Item, md5 string) (library.Item, bool) {
 	for _, item := range items {
 		if item.MD5 == md5 {
 			return item, true
