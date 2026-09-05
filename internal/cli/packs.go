@@ -101,6 +101,26 @@ func runPackUpdate(cmd *cobra.Command, options *rootOptions, args []string) erro
 	}, false)
 }
 
+func runPackRemove(cmd *cobra.Command, options *rootOptions, args []string) error {
+	dryRun, err := cmd.Flags().GetBool("dry-run")
+	if err != nil {
+		return err
+	}
+	home, err := resolveHome(options)
+	if err != nil {
+		return err
+	}
+	result, err := packs.Remove(cmd.Context(), packs.RemoveOptions{
+		Home:   home,
+		PackID: args[0],
+		DryRun: dryRun,
+	})
+	if err != nil {
+		return normalizePackError(err)
+	}
+	return writeResult(cmd, options, result, false)
+}
+
 func runPackList(cmd *cobra.Command, options *rootOptions) error {
 	source, err := cmd.Flags().GetString("source")
 	if err != nil {
