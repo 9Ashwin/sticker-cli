@@ -152,7 +152,7 @@ func packUpdateMetadata() commandMetadata {
 		Effect:      effectWrite,
 		Parameters:  []parameterMetadata{{Name: "id", Type: "string", Source: "argument", Description: "Installed pack ID", Required: true}},
 		Flags:       []flagMetadata{{Name: "dry-run", Type: "bool", Default: false, Description: "Show the plan without writing"}},
-		Result:      objectSchema("pack", "object", "revision", "string", "added", "int", "reused", "int", "download_bytes", "int"),
+		Result:      objectSchema("source", "string", "target", "string", "pack", "object", "revision", "string", "added", "int", "reused", "int", "download_bytes", "int", "dry_run", "bool"),
 		Errors:      defaultErrors(),
 		Examples:    []string{"sticker packs update curated", "sticker packs update curated --dry-run"},
 		Args:        cobra.ExactArgs(1),

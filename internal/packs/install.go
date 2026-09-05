@@ -41,6 +41,11 @@ type InstallPlan struct {
 	DownloadBytes int64  `json:"download_bytes"`
 }
 
+// UpdatePlan is the preflight result for an explicitly requested update.
+// It has the same fields as an installation plan so callers can render both
+// operations with one result contract.
+type UpdatePlan = InstallPlan
+
 // InstallOptions controls a complete pack installation. Image transfer is
 // performed before the library lock is acquired; only the final validation and
 // state publication run under that lock.
@@ -63,6 +68,9 @@ type InstallResult struct {
 	Reused        int    `json:"reused"`
 	DownloadBytes int64  `json:"download_bytes"`
 }
+
+// UpdateResult is the result of one explicitly requested pack update.
+type UpdateResult = InstallResult
 
 type preparedInstall struct {
 	root     *library.Library
@@ -201,42 +209,11 @@ func Install(ctx context.Context, options InstallOptions) (InstallResult, error)
 		Revision: plan.Revision,
 	}
 
-	var stagingRoot string
-	staged := make(map[string]stagedImage)
-	stagingRoot, err = createStagingDirectory(prepared.root)
+	stagingRoot, staged, downloaded, err := stageMissingImages(ctx, prepared, options.HTTPClient, options.Backoff)
 	if err != nil {
 		return InstallResult{}, err
 	}
-	stagingLibrary, err := library.New(stagingRoot)
-	if err != nil {
-		return InstallResult{}, fromLibraryError(err)
-	}
-	if err := stagingLibrary.EnsureRelativeDirectory(library.EmoticonsDirectory); err != nil {
-		return InstallResult{}, fromLibraryError(err)
-	}
-	for _, item := range prepared.snapshot.manifest.Items {
-		if err := contextErr(ctx); err != nil {
-			return InstallResult{}, installCancelled(err)
-		}
-		if err := prepared.root.VerifyItem(ctx, item); err == nil {
-			continue
-		} else if !errors.Is(err, os.ErrNotExist) {
-			return InstallResult{}, fromLibraryError(err)
-		}
-		candidate, found, err := findReusableStaged(ctx, prepared.home, item)
-		if err != nil {
-			return InstallResult{}, err
-		}
-		if found {
-			staged[item.MD5] = stagedImage{root: candidate}
-			continue
-		}
-		if err := downloadImage(ctx, prepared.source, item, stagingRoot, options.HTTPClient, options.Backoff); err != nil {
-			return InstallResult{}, err
-		}
-		staged[item.MD5] = stagedImage{root: stagingRoot}
-		result.DownloadBytes += item.Size
-	}
+	result.DownloadBytes += downloaded
 
 	result, err = publishInstall(ctx, prepared, staged, result, options.Now)
 	if err != nil {
@@ -258,6 +235,245 @@ func createStagingDirectory(root *library.Library) (string, error) {
 		return "", fromLibraryError(err)
 	}
 	return path, nil
+}
+
+func stageMissingImages(ctx context.Context, prepared preparedInstall, client *http.Client, backoff func(context.Context, time.Duration) error) (string, map[string]stagedImage, int64, error) {
+	stagingRoot, err := createStagingDirectory(prepared.root)
+	if err != nil {
+		return "", nil, 0, err
+	}
+	staged := make(map[string]stagedImage)
+	stagingLibrary, err := library.New(stagingRoot)
+	if err != nil {
+		return stagingRoot, staged, 0, fromLibraryError(err)
+	}
+	if err := stagingLibrary.EnsureRelativeDirectory(library.EmoticonsDirectory); err != nil {
+		return stagingRoot, staged, 0, fromLibraryError(err)
+	}
+	var downloaded int64
+	for _, item := range prepared.snapshot.manifest.Items {
+		if err := contextErr(ctx); err != nil {
+			return stagingRoot, staged, downloaded, installCancelled(err)
+		}
+		if err := prepared.root.VerifyItem(ctx, item); err == nil {
+			continue
+		} else if !errors.Is(err, os.ErrNotExist) {
+			return stagingRoot, staged, downloaded, fromLibraryError(err)
+		}
+		candidate, found, err := findReusableStaged(ctx, prepared.home, item)
+		if err != nil {
+			return stagingRoot, staged, downloaded, err
+		}
+		if found {
+			staged[item.MD5] = stagedImage{root: candidate}
+			continue
+		}
+		if err := downloadImage(ctx, prepared.source, item, stagingRoot, client, backoff); err != nil {
+			return stagingRoot, staged, downloaded, err
+		}
+		staged[item.MD5] = stagedImage{root: stagingRoot}
+		downloaded += item.Size
+	}
+	return stagingRoot, staged, downloaded, nil
+}
+
+// UpdateOptions controls a refresh of one installed pack. The source is read
+// from the installed state so an update cannot silently switch origins.
+type UpdateOptions struct {
+	Home       string
+	PackID     string
+	HTTPClient *http.Client
+	Backoff    func(context.Context, time.Duration) error
+	Now        func() time.Time
+}
+
+type preparedUpdate struct {
+	prepared preparedInstall
+	state    installedState
+}
+
+// PlanUpdate reads the saved source for an installed pack, fetches its latest
+// validated manifest, and counts local work without creating library state or
+// staging files.
+func PlanUpdate(ctx context.Context, options UpdateOptions) (UpdatePlan, error) {
+	prepared, err := prepareUpdate(ctx, options)
+	if err != nil {
+		return UpdatePlan{}, err
+	}
+	return makeInstallPlan(ctx, prepared.prepared)
+}
+
+func prepareUpdate(ctx context.Context, options UpdateOptions) (preparedUpdate, error) {
+	if err := contextErr(ctx); err != nil {
+		return preparedUpdate{}, installCancelled(err)
+	}
+	if !packIDPattern.MatchString(options.PackID) {
+		return preparedUpdate{}, newError("validation", "invalid_argument", "pack ID is required", "Provide one valid pack ID from packs list.")
+	}
+	home, err := resolveHome(options.Home)
+	if err != nil {
+		return preparedUpdate{}, err
+	}
+	root, err := library.New(home)
+	if err != nil {
+		return preparedUpdate{}, fromLibraryError(err)
+	}
+	state, installed, err := readInstalledState(home, options.PackID)
+	if err != nil {
+		return preparedUpdate{}, err
+	}
+	if !installed {
+		return preparedUpdate{}, newError("not_found", "pack_not_found", fmt.Sprintf("pack %s is not installed", options.PackID), "Install the pack before updating it.")
+	}
+	source, err := Resolve(state.Source)
+	if err != nil {
+		return preparedUpdate{}, invalidInstalledState(options.PackID, "source is invalid")
+	}
+	if source.IsLocal() {
+		if err := source.validateLocal(); err != nil {
+			return preparedUpdate{}, err
+		}
+	}
+	personal, err := root.ReadManifest(ctx)
+	if err != nil {
+		return preparedUpdate{}, fromLibraryError(err)
+	}
+	snapshot, err := fetchPackSnapshot(ctx, source, Options{
+		HTTPClient: options.HTTPClient,
+		Backoff:    options.Backoff,
+	}, options.PackID)
+	if err != nil {
+		return preparedUpdate{}, err
+	}
+	if err := checkPersonalConflicts(personal, snapshot.manifest, options.PackID); err != nil {
+		return preparedUpdate{}, err
+	}
+	snapshot.pack.Installed = true
+	return preparedUpdate{
+		prepared: preparedInstall{root: root, home: home, source: source, snapshot: snapshot},
+		state:    state,
+	}, nil
+}
+
+// Update downloads and validates a new manifest revision before replacing
+// the installed state. The old state remains authoritative until every image
+// in the new manifest has been persisted and verified.
+func Update(ctx context.Context, options UpdateOptions) (UpdateResult, error) {
+	prepared, err := prepareUpdate(ctx, options)
+	if err != nil {
+		return UpdateResult{}, err
+	}
+	plan, err := makeInstallPlan(ctx, prepared.prepared)
+	if err != nil {
+		return UpdateResult{}, err
+	}
+	result := UpdateResult{
+		Source:   plan.Source,
+		Target:   plan.Target,
+		Pack:     plan.Pack,
+		Revision: plan.Revision,
+	}
+	stagingRoot, staged, downloaded, err := stageMissingImages(ctx, prepared.prepared, options.HTTPClient, options.Backoff)
+	if err != nil {
+		return UpdateResult{}, err
+	}
+	result.DownloadBytes = downloaded
+	result, err = publishUpdate(ctx, prepared, staged, result, options.Now)
+	if err != nil {
+		return UpdateResult{}, err
+	}
+	if stagingRoot != "" {
+		_ = os.RemoveAll(stagingRoot)
+	}
+	return result, nil
+}
+
+func publishUpdate(ctx context.Context, prepared preparedUpdate, staged map[string]stagedImage, result UpdateResult, now func() time.Time) (UpdateResult, error) {
+	result.Pack.Installed = true
+	err := prepared.prepared.root.WithWriteLock(ctx, func(personal library.Manifest) error {
+		if err := checkPersonalConflicts(personal, prepared.prepared.snapshot.manifest, prepared.prepared.snapshot.pack.ID); err != nil {
+			return err
+		}
+		state, installed, err := readInstalledState(prepared.prepared.home, prepared.prepared.snapshot.pack.ID)
+		if err != nil {
+			return err
+		}
+		if !installed {
+			return newError("conflict", "state_changed", fmt.Sprintf("pack %s is no longer installed", prepared.prepared.snapshot.pack.ID), "Install the pack again before updating it.")
+		}
+		if err := validateUpdateState(state, prepared.prepared.source, prepared.state.Revision, prepared.prepared.snapshot.pack.ID); err != nil {
+			return err
+		}
+
+		result.Added = 0
+		result.Reused = 0
+		for _, item := range prepared.prepared.snapshot.manifest.Items {
+			if err := contextErr(ctx); err != nil {
+				return installCancelled(err)
+			}
+			if err := prepared.prepared.root.VerifyItem(ctx, item); err == nil {
+				result.Reused++
+				continue
+			} else if !errors.Is(err, os.ErrNotExist) {
+				return fromLibraryError(err)
+			}
+			stagedItem, ok := staged[item.MD5]
+			if !ok {
+				return newError("integrity", "invalid_image", fmt.Sprintf("staged image %s is missing", item.MD5), "Retry the update to download the missing image.")
+			}
+			data, err := readStagedItem(ctx, stagedItem.root, item)
+			if err != nil {
+				return err
+			}
+			if err := prepared.prepared.root.WriteRelativeAtomic(ctx, item.Filename, data); err != nil {
+				return fromLibraryError(err)
+			}
+			if err := prepared.prepared.root.VerifyItem(ctx, item); err != nil {
+				return fromLibraryError(err)
+			}
+			result.Added++
+		}
+
+		if err := prepared.prepared.root.EnsureRelativeDirectory(filepath.ToSlash(filepath.Join(".sticker", "packs"))); err != nil {
+			return fromLibraryError(err)
+		}
+		if now == nil {
+			now = time.Now
+		}
+		stateBytes, err := encodeInstalledState(installedState{
+			SchemaVersion: 1,
+			ID:            prepared.prepared.snapshot.pack.ID,
+			Source:        prepared.prepared.source.Canonical,
+			Revision:      prepared.prepared.snapshot.pack.Revision,
+			InstalledAt:   now().UTC(),
+			Manifest:      append([]byte(nil), prepared.prepared.snapshot.manifestBytes...),
+		})
+		if err != nil {
+			return err
+		}
+		if err := prepared.prepared.root.WriteRelativeAtomic(ctx, filepath.ToSlash(filepath.Join(".sticker", "packs", prepared.prepared.snapshot.pack.ID+".json")), stateBytes); err != nil {
+			return fromLibraryError(err)
+		}
+		return nil
+	})
+	if err != nil {
+		return UpdateResult{}, err
+	}
+	return result, nil
+}
+
+func validateUpdateState(state installedState, source Source, revision, id string) error {
+	stateSource, err := Resolve(state.Source)
+	if err != nil {
+		return invalidInstalledState(id, "source is invalid")
+	}
+	if stateSource.Canonical != source.Canonical {
+		return newError("conflict", "source_conflict", fmt.Sprintf("pack %s source changed while updating", id), "Restore the saved pack source or remove the installed pack before retrying.")
+	}
+	if state.Revision != revision {
+		return newError("conflict", "state_changed", fmt.Sprintf("pack %s changed while updating", id), "Read the installed state and retry the update.")
+	}
+	return nil
 }
 
 func findReusableStaged(ctx context.Context, home string, item library.Item) (string, bool, error) {
