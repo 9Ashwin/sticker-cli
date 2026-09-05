@@ -1,33 +1,35 @@
-# 实施 Issue 草案：emoticon-cli
+# 实施 Issues：emoticon-cli
 
-状态：待评审，**尚未创建 GitHub Issues**。编号 I01…I18 仅是本文件的依赖标识。
+状态：18 项已创建为 GitHub Issues，16 项在 CLI 仓库、2 项在素材仓库。编号 I01…I18 用于保持设计与实际 Issue 的映射。
 
 来源：[PRD](prd-emoticon-cli.md)、[SPEC](spec-emoticon-cli.md)。P1 为首个可用闭环，P2 为后续生命周期功能。
 
 | 编号 | 标题 | 阶段 | 依赖 | 目标仓库 |
 | --- | --- | --- | --- | --- |
-| I01 | Go 项目与 CLI 入口 | P1 | 无 | emoticon-cli |
-| I02 | 标准素材库 I/O 与安全提交 | P1 | I01 | emoticon-cli |
-| I03 | 命令帮助、schema 与结构化输出 | P1 | I01 | emoticon-cli |
-| I04 | 素材包目录与修订合同 | P1 | 无 | 素材仓库 |
-| I05 | 精选复核与素材仓库改名 | P1 | I04 | 素材仓库 |
-| I06 | 素材源发现与离线目录缓存 | P1 | I02、I03、I04 | emoticon-cli |
-| I07 | 安装预检与 dry-run | P1 | I06 | emoticon-cli |
-| I08 | 按需下载与可恢复安装 | P1 | I07 | emoticon-cli |
-| I09 | 离线检索与有界分页 | P1 | I02、I03 | emoticon-cli |
-| I10 | 已验证原图读取 | P1 | I09 | emoticon-cli |
-| I11 | 本地原图与已安装图片收藏 | P1 | I02、I03、I10 | emoticon-cli |
-| I12 | 标准 v1 素材库合并导入 | P1 | I11 | emoticon-cli |
-| I13 | 收藏列表、描述修改与取消 | P2 | I11 | emoticon-cli |
-| I14 | 标准收藏包导出与迁移 | P2 | I12 | emoticon-cli |
-| I15 | 显式素材更新 | P2 | I08、I11 | emoticon-cli |
-| I16 | 素材包卸载与收藏保留 | P2 | I08、I11 | emoticon-cli |
-| I17 | Go 二进制分发与平台验收 | P1 | I05、I08、I10、I12 | emoticon-cli |
-| I18 | Agent Skill 与端到端使用验收 | P1 | I03、I05、I08、I10、I12、I17 | emoticon-cli |
+| [I01](https://github.com/9Ashwin/emoticon-cli/issues/1) | Go 项目与 CLI 入口 | P1 | 无 | emoticon-cli |
+| [I02](https://github.com/9Ashwin/emoticon-cli/issues/2) | 标准素材库 I/O 与安全提交 | P1 | I01 | emoticon-cli |
+| [I03](https://github.com/9Ashwin/emoticon-cli/issues/3) | 命令帮助、schema 与结构化输出 | P1 | I01 | emoticon-cli |
+| [I04](https://github.com/9Ashwin/wechat-emoticon-pack/issues/1) | 素材包目录与修订合同 | P1 | 无 | 素材仓库 |
+| [I05](https://github.com/9Ashwin/wechat-emoticon-pack/issues/2) | 精选复核与素材仓库改名 | P1 | I04 | 素材仓库 |
+| [I06](https://github.com/9Ashwin/emoticon-cli/issues/4) | 素材源发现与离线目录缓存 | P1 | I02、I03、I04 | emoticon-cli |
+| [I07](https://github.com/9Ashwin/emoticon-cli/issues/5) | 安装预检与 dry-run | P1 | I06 | emoticon-cli |
+| [I08](https://github.com/9Ashwin/emoticon-cli/issues/6) | 按需下载与可恢复安装 | P1 | I07 | emoticon-cli |
+| [I09](https://github.com/9Ashwin/emoticon-cli/issues/7) | 离线检索与有界分页 | P1 | I02、I03 | emoticon-cli |
+| [I10](https://github.com/9Ashwin/emoticon-cli/issues/8) | 已验证原图读取 | P1 | I09 | emoticon-cli |
+| [I11](https://github.com/9Ashwin/emoticon-cli/issues/9) | 本地原图与已安装图片收藏 | P1 | I02、I03、I10 | emoticon-cli |
+| [I12](https://github.com/9Ashwin/emoticon-cli/issues/10) | 标准 v1 素材库合并导入 | P1 | I11 | emoticon-cli |
+| [I13](https://github.com/9Ashwin/emoticon-cli/issues/11) | 收藏列表、描述修改与取消 | P2 | I11 | emoticon-cli |
+| [I14](https://github.com/9Ashwin/emoticon-cli/issues/12) | 标准收藏包导出与迁移 | P2 | I12 | emoticon-cli |
+| [I15](https://github.com/9Ashwin/emoticon-cli/issues/13) | 显式素材更新 | P2 | I08、I11 | emoticon-cli |
+| [I16](https://github.com/9Ashwin/emoticon-cli/issues/14) | 素材包卸载与收藏保留 | P2 | I08、I11 | emoticon-cli |
+| [I17](https://github.com/9Ashwin/emoticon-cli/issues/15) | Go 二进制分发与平台验收 | P1 | I05、I08、I10、I12 | emoticon-cli |
+| [I18](https://github.com/9Ashwin/emoticon-cli/issues/16) | Agent Skill 与端到端使用验收 | P1 | I03、I05、I08、I10、I12、I17 | emoticon-cli |
 
 素材仓库当前为 `9Ashwin/wechat-emoticon-pack`，拟改名 `9Ashwin/agent-emoticon-packs`。创建其 Issues 时先解析实际仓库名，避免误投到 CLI。
 
 ## I01：Go 项目与 CLI 入口
+
+GitHub：[9Ashwin/emoticon-cli#1](https://github.com/9Ashwin/emoticon-cli/issues/1)
 
 范围：US-001。阶段：P1。类型：infra。优先级：high。
 
@@ -42,6 +44,8 @@
 相关实现运行聚焦回归、Go test/vet/lint；并发和文件提交增加 race 与目标平台验证。素材任务运行清单/原图校验及文档链接检查。
 
 ## I02：标准素材库 I/O 与安全提交
+
+GitHub：[9Ashwin/emoticon-cli#2](https://github.com/9Ashwin/emoticon-cli/issues/2)
 
 范围：横切 FR-4/7/15。阶段：P1。类型：backend。优先级：high。
 
@@ -58,6 +62,8 @@
 
 ## I03：命令帮助、schema 与结构化输出
 
+GitHub：[9Ashwin/emoticon-cli#3](https://github.com/9Ashwin/emoticon-cli/issues/3)
+
 范围：US-002。阶段：P1。类型：backend。优先级：high。
 
 依赖：I01。SPEC：§2、4.1–4.2。验证组：T02。
@@ -73,6 +79,8 @@
 
 ## I04：素材包目录与修订合同
 
+GitHub：[9Ashwin/wechat-emoticon-pack#1](https://github.com/9Ashwin/wechat-emoticon-pack/issues/1)
+
 范围：US-012。阶段：P1。类型：infra。优先级：high。
 
 依赖：无。SPEC：§3.2–3.3。验证组：T12。
@@ -86,6 +94,8 @@
 相关实现运行聚焦回归、Go test/vet/lint；并发和文件提交增加 race 与目标平台验证。素材任务运行清单/原图校验及文档链接检查。
 
 ## I05：精选复核与素材仓库改名
+
+GitHub：[9Ashwin/wechat-emoticon-pack#2](https://github.com/9Ashwin/wechat-emoticon-pack/issues/2)
 
 范围：US-012。阶段：P1。类型：infra。优先级：high。
 
@@ -102,6 +112,8 @@
 
 ## I06：素材源发现与离线目录缓存
 
+GitHub：[9Ashwin/emoticon-cli#4](https://github.com/9Ashwin/emoticon-cli/issues/4)
+
 范围：US-003。阶段：P1。类型：backend。优先级：high。
 
 依赖：I02、I03、I04。SPEC：§3.3–3.4、4.1、6。验证组：T03。
@@ -116,6 +128,8 @@
 相关实现运行聚焦回归、Go test/vet/lint；并发和文件提交增加 race 与目标平台验证。素材任务运行清单/原图校验及文档链接检查。
 
 ## I07：安装预检与 dry-run
+
+GitHub：[9Ashwin/emoticon-cli#5](https://github.com/9Ashwin/emoticon-cli/issues/5)
 
 范围：US-004。阶段：P1。类型：backend。优先级：high。
 
@@ -132,6 +146,8 @@
 
 ## I08：按需下载与可恢复安装
 
+GitHub：[9Ashwin/emoticon-cli#6](https://github.com/9Ashwin/emoticon-cli/issues/6)
+
 范围：US-004。阶段：P1。类型：backend。优先级：high。
 
 依赖：I07。SPEC：§5.1、5.3、6。验证组：T04、T14。
@@ -146,6 +162,8 @@
 相关实现运行聚焦回归、Go test/vet/lint；并发和文件提交增加 race 与目标平台验证。素材任务运行清单/原图校验及文档链接检查。
 
 ## I09：离线检索与有界分页
+
+GitHub：[9Ashwin/emoticon-cli#7](https://github.com/9Ashwin/emoticon-cli/issues/7)
 
 范围：US-005。阶段：P1。类型：backend。优先级：high。
 
@@ -162,6 +180,8 @@
 
 ## I10：已验证原图读取
 
+GitHub：[9Ashwin/emoticon-cli#8](https://github.com/9Ashwin/emoticon-cli/issues/8)
+
 范围：US-006。阶段：P1。类型：backend。优先级：high。
 
 依赖：I09。SPEC：§4.1、4.3、5.3。验证组：T06。
@@ -175,6 +195,8 @@
 相关实现运行聚焦回归、Go test/vet/lint；并发和文件提交增加 race 与目标平台验证。素材任务运行清单/原图校验及文档链接检查。
 
 ## I11：本地原图与已安装图片收藏
+
+GitHub：[9Ashwin/emoticon-cli#9](https://github.com/9Ashwin/emoticon-cli/issues/9)
 
 范围：US-007。阶段：P1。类型：backend。优先级：high。
 
@@ -191,6 +213,8 @@
 
 ## I12：标准 v1 素材库合并导入
 
+GitHub：[9Ashwin/emoticon-cli#10](https://github.com/9Ashwin/emoticon-cli/issues/10)
+
 范围：US-009。阶段：P1。类型：backend。优先级：high。
 
 依赖：I11。SPEC：§3.2、5.2、6。验证组：T09。
@@ -206,6 +230,8 @@
 
 ## I13：收藏列表、描述修改与取消
 
+GitHub：[9Ashwin/emoticon-cli#11](https://github.com/9Ashwin/emoticon-cli/issues/11)
+
 范围：US-008。阶段：P2。类型：backend。优先级：medium。
 
 依赖：I11。SPEC：§4.1、5.4。验证组：T08。
@@ -219,6 +245,8 @@
 相关实现运行聚焦回归、Go test/vet/lint；并发和文件提交增加 race 与目标平台验证。素材任务运行清单/原图校验及文档链接检查。
 
 ## I14：标准收藏包导出与迁移
+
+GitHub：[9Ashwin/emoticon-cli#12](https://github.com/9Ashwin/emoticon-cli/issues/12)
 
 范围：US-010。阶段：P2。类型：backend。优先级：medium。
 
@@ -235,6 +263,8 @@
 
 ## I15：显式素材更新
 
+GitHub：[9Ashwin/emoticon-cli#13](https://github.com/9Ashwin/emoticon-cli/issues/13)
+
 范围：US-011。阶段：P2。类型：backend。优先级：medium。
 
 依赖：I08、I11。SPEC：§3.4、5.1。验证组：T11。
@@ -249,6 +279,8 @@
 
 ## I16：素材包卸载与收藏保留
 
+GitHub：[9Ashwin/emoticon-cli#14](https://github.com/9Ashwin/emoticon-cli/issues/14)
+
 范围：US-011。阶段：P2。类型：backend。优先级：medium。
 
 依赖：I08、I11。SPEC：§4.1、5.4。验证组：T11。
@@ -262,6 +294,8 @@
 相关实现运行聚焦回归、Go test/vet/lint；并发和文件提交增加 race 与目标平台验证。素材任务运行清单/原图校验及文档链接检查。
 
 ## I17：Go 二进制分发与平台验收
+
+GitHub：[9Ashwin/emoticon-cli#15](https://github.com/9Ashwin/emoticon-cli/issues/15)
 
 范围：US-001。阶段：P1。类型：infra。优先级：high。
 
@@ -278,6 +312,8 @@
 
 ## I18：Agent Skill 与端到端使用验收
 
+GitHub：[9Ashwin/emoticon-cli#16](https://github.com/9Ashwin/emoticon-cli/issues/16)
+
 范围：US-013。阶段：P1。类型：infra。优先级：high。
 
 依赖：I03、I05、I08、I10、I12、I17。SPEC：§2、4、8。验证组：T13。
@@ -291,8 +327,8 @@
 
 相关实现运行聚焦回归、Go test/vet/lint；并发和文件提交增加 race 与目标平台验证。素材任务运行清单/原图校验及文档链接检查。
 
-## 创建前评审
+## 创建结果
 
-确认本清单后，将 I04/I05 建在素材仓库，其余建在 CLI 仓库，并将依赖改写为真实 Issue 链接。创建 Issue 不自动启动实现。
+I04/I05 已建在素材仓库，其余已建在 CLI 仓库；各 Issue 正文中的依赖均已改写为真实跨仓库链接。当前仅完成任务创建，尚未启动实现。
 
 本清单没有新增 SQLite 或 JSONL 任务：首版使用现有 JSON 素材格式，后续索引需求按 SPEC §3.5 再评估。

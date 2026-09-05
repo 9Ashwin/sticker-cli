@@ -309,4 +309,4 @@ emoticon favorites export /path/to/new-export
 
 ## 12. 下一步
 
-需求已确认。下一步评审 [技术 SPEC](spec-emoticon-cli.md) 与 [Issue 草案](issues-emoticon-cli.md)，确定后创建实施任务。
+需求已确认。[技术 SPEC](spec-emoticon-cli.md) 与 [18 项实施 Issues](issues-emoticon-cli.md) 已就绪，后续按依赖顺序实施。
