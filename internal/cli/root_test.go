@@ -316,6 +316,29 @@ func TestHelpDoesNotBypassArgumentValidation(t *testing.T) {
 	}
 }
 
+func TestExplicitBooleanValuesRemainValidAroundHelp(t *testing.T) {
+	var out, errOut bytes.Buffer
+	if code := Run(context.Background(), []string{"--help=false", "version"}, &out, &errOut, "v1", "abc"); code != 0 {
+		t.Fatalf("--help=false version exit %d: %s", code, errOut.String())
+	}
+	if !json.Valid(out.Bytes()) || errOut.Len() != 0 {
+		t.Fatalf("unexpected --help=false streams: %s / %s", out.String(), errOut.String())
+	}
+
+	out.Reset()
+	errOut.Reset()
+	if code := Run(context.Background(), []string{"--format", "table", "--json=true", "--help"}, &out, &errOut, "v1", "abc"); code != 2 || out.Len() != 0 {
+		t.Fatalf("expected --json=true conflict, got exit %d stdout %q stderr %q", code, out.String(), errOut.String())
+	}
+	assertError(t, errOut.Bytes(), "validation", "invalid_argument")
+
+	out.Reset()
+	errOut.Reset()
+	if code := Run(context.Background(), []string{"--format", "table", "--json=false", "--help"}, &out, &errOut, "v1", "abc"); code != 0 || !strings.Contains(out.String(), "Usage:") || errOut.Len() != 0 {
+		t.Fatalf("unexpected --json=false help streams: %d %q / %q", code, out.String(), errOut.String())
+	}
+}
+
 func TestGetSchemaDeclaresPreviewPath(t *testing.T) {
 	var out, errOut bytes.Buffer
 	if code := Run(context.Background(), []string{"schema", "get"}, &out, &errOut, "dev", "unknown"); code != 0 {

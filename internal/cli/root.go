@@ -509,13 +509,25 @@ func isHiddenCompletionInvocation(args []string) bool {
 
 func validateHelpInvocation(root *cobra.Command, args []string) error {
 	helpIndex := -1
+scan:
 	for index, argument := range args {
 		if argument == "--" {
 			break
 		}
-		if argument == "--help" || argument == "-h" || strings.HasPrefix(argument, "--help=") {
+		if argument == "--help" || argument == "-h" {
 			helpIndex = index
 			break
+		}
+		if strings.HasPrefix(argument, "--help=") {
+			switch strings.TrimPrefix(argument, "--help=") {
+			case "true":
+				helpIndex = index
+				break scan
+			case "false":
+				continue
+			default:
+				return validationError("invalid_argument", "--help must be true or false", "Use --help or --help=false.")
+			}
 		}
 	}
 	if helpIndex < 0 {
@@ -549,6 +561,15 @@ func helpOptions(args []string) (*rootOptions, error) {
 		switch {
 		case argument == "--json":
 			options.json = true
+		case strings.HasPrefix(argument, "--json="):
+			switch strings.TrimPrefix(argument, "--json=") {
+			case "true":
+				options.json = true
+			case "false":
+				options.json = false
+			default:
+				return nil, validationError("invalid_argument", "--json must be true or false", "Use --json or --json=false.")
+			}
 		case argument == "--format":
 			if index+1 >= len(args) {
 				return nil, validationError("invalid_argument", "flag requires a value: --format", "Provide json or table before --help.")
