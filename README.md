@@ -12,7 +12,7 @@
 
 [PRD](tasks/prd-sticker-cli.md) 已确认，[技术 SPEC](tasks/spec-sticker-cli.md) 和 [实施 GitHub Issues](tasks/issues-sticker-cli.md) 已就绪。首版使用现有 JSON 清单，SQLite 可重建索引作为有明确需求后的选项，JSONL 不作为素材库格式。
 
-已进入按 Issue 实施阶段，`packs list`、`packs install`（含 `--dry-run`）、`get` 以及个人收藏的添加、列表、描述修改和取消已实现，其余命令仍以设计文档为准。当前尚未发布完整可用版本。
+已进入按 Issue 实施阶段，`packs list`、`packs install`（含 `--dry-run`）、`get` 以及个人收藏的添加、导入、列表、描述修改和取消已实现，其余命令仍以设计文档为准。当前尚未发布完整可用版本。
 
 ## 源码开发
 

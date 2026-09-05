@@ -68,6 +68,18 @@ func TestExistingCorruptManifestIsNotEmpty(t *testing.T) {
 	}
 }
 
+func TestReadManifestRequiredRejectsMissingManifest(t *testing.T) {
+	library, err := New(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = library.ReadManifestRequired(context.Background())
+	var coded *Error
+	if !errors.As(err, &coded) || coded.Kind != "not_found" || coded.Subtype != "source_not_found" {
+		t.Fatalf("got %T %v", err, err)
+	}
+}
+
 func TestManifestRejectsDuplicateKeysAndUnsafeFilename(t *testing.T) {
 	root := t.TempDir()
 	data := []byte(`{"schema_version":1,"collection":"personal","collection":"other","items":[]}`)
