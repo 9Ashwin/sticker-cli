@@ -21,22 +21,22 @@ func openRelativeNoFollow(root, relative string) (*os.File, error) {
 	if err := rejectSymlinkComponents(root, target); err != nil {
 		return nil, err
 	}
-	file, err := openNoFollow(target)
-	if err != nil {
-		return nil, err
-	}
-	final, err := finalPath(file)
-	if err != nil {
-		_ = file.Close()
-		return nil, err
-	}
 	rootFile, err := os.Open(root)
 	if err != nil {
-		_ = file.Close()
 		return nil, err
 	}
 	rootFinal, err := finalPath(rootFile)
+	if err != nil {
+		_ = rootFile.Close()
+		return nil, err
+	}
+	file, err := openNoFollow(target)
+	if err != nil {
+		_ = rootFile.Close()
+		return nil, err
+	}
 	_ = rootFile.Close()
+	final, err := finalPath(file)
 	if err != nil {
 		_ = file.Close()
 		return nil, err
@@ -45,7 +45,7 @@ func openRelativeNoFollow(root, relative string) (*os.File, error) {
 	normalizedFinal := normalizeWindowsPath(final)
 	if !strings.EqualFold(normalizedFinal, normalizedRoot) && !strings.HasPrefix(strings.ToLower(normalizedFinal), strings.ToLower(normalizedRoot)+`\`) {
 		_ = file.Close()
-		return nil, errorf("validation", "unsafe_path", "Remove links from the library path.", "opened path escapes library root (%s outside %s)", normalizedFinal, normalizedRoot)
+		return nil, errorf("validation", "unsafe_path", "Remove links from the library path.", "opened path escapes library root")
 	}
 	return file, nil
 }
