@@ -21,7 +21,7 @@ func openRelativeNoFollow(root, relative string) (*os.File, error) {
 	if err := rejectSymlinkComponents(root, target); err != nil {
 		return nil, err
 	}
-	rootFile, err := os.Open(root)
+	rootFile, err := openDirectoryNoReparse(root)
 	if err != nil {
 		return nil, err
 	}
