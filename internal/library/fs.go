@@ -69,6 +69,23 @@ func (l *Library) EnsureRelativeDirectory(relative string) error {
 	return ensureRelativeDirectoryPlatform(l.Root, filepath.FromSlash(relative))
 }
 
+// EnsureRelativeDirectoryNoState creates a directory beneath an already
+// existing library root without creating the library's private .sticker state
+// directory. It is intended for temporary material roots that must contain
+// only standard library files.
+func (l *Library) EnsureRelativeDirectoryNoState(relative string) error {
+	if relative == "" || filepath.IsAbs(filepath.FromSlash(relative)) || filepath.Clean(filepath.FromSlash(relative)) != filepath.FromSlash(relative) || filepath.VolumeName(filepath.FromSlash(relative)) != "" {
+		return errorf("validation", "unsafe_path", "Use a directory inside the library root.", "path escapes library root")
+	}
+	if err := l.ensureRoot(false); err != nil {
+		return err
+	}
+	if relative == "." {
+		return nil
+	}
+	return ensureRelativeDirectoryPlatform(l.Root, filepath.FromSlash(relative))
+}
+
 // CreateRelativeTempDirectory creates a private temporary directory beneath
 // an existing directory inside the library root. Unix implementations create
 // it through an anchored directory descriptor to avoid path-swap races.

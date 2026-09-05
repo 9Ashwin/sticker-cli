@@ -148,3 +148,23 @@ func runFavoriteImport(ctx context.Context, cmd *cobra.Command, options *rootOpt
 	}
 	return writeResult(cmd, options, result, false)
 }
+
+func runFavoriteExport(ctx context.Context, cmd *cobra.Command, options *rootOptions, args []string) error {
+	home, err := resolveHome(options)
+	if err != nil {
+		return err
+	}
+	dryRun, err := cmd.Flags().GetBool("dry-run")
+	if err != nil {
+		return err
+	}
+	result, err := stickerfavorites.Export(ctx, stickerfavorites.ExportOptions{
+		Home:        home,
+		Destination: args[0],
+		DryRun:      dryRun,
+	})
+	if err != nil {
+		return err
+	}
+	return writeResult(cmd, options, result, false)
+}

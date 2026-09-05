@@ -160,6 +160,31 @@ func (l *Library) ReadManifestRequired(ctx context.Context) (Manifest, error) {
 	return l.readManifest(ctx, true)
 }
 
+// WithReadLock runs fn while holding the library's shared lock when one is
+// present. The callback receives the manifest snapshot read under that lock,
+// which lets read operations open referenced files without racing a manifest
+// writer between the snapshot and the file handles.
+func (l *Library) WithReadLock(ctx context.Context, fn func(Manifest) error) error {
+	if fn == nil {
+		return errorf("validation", "invalid_argument", "Provide a read callback.", "read callback is nil")
+	}
+	if err := l.ensureRoot(false); err != nil {
+		return err
+	}
+	lock, err := acquireReadLockIfPresent(ctx, l.Root, l.lockTimeout())
+	if err != nil {
+		return err
+	}
+	if lock != nil {
+		defer func() { _ = lock.Close() }()
+	}
+	manifest, err := l.readManifestUnlocked(ctx, false)
+	if err != nil {
+		return err
+	}
+	return fn(manifest)
+}
+
 func (l *Library) readManifest(ctx context.Context, required bool) (Manifest, error) {
 	if err := contextErr(ctx); err != nil {
 		return Manifest{}, err
