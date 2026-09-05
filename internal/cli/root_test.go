@@ -369,12 +369,15 @@ func TestGetSchemaDeclaresPreviewPath(t *testing.T) {
 }
 
 func TestFavoriteRemoveAcceptsMultipleIDs(t *testing.T) {
+	home := t.TempDir()
 	var out, errOut bytes.Buffer
 	ids := []string{"0123456789abcdef0123456789abcdef", "abcdef0123456789abcdef0123456789"}
-	if code := Run(context.Background(), append([]string{"favorites", "remove"}, ids...), &out, &errOut, "dev", "unknown"); code != 1 || out.Len() != 0 {
+	if code := Run(context.Background(), append([]string{"--home", home, "favorites", "remove"}, ids...), &out, &errOut, "dev", "unknown"); code != 0 || !json.Valid(out.Bytes()) || errOut.Len() != 0 {
 		t.Fatalf("unexpected remove result: exit %d stdout %q stderr %q", code, out.String(), errOut.String())
 	}
-	assertError(t, errOut.Bytes(), "internal", "unimplemented")
+	if !strings.Contains(out.String(), `"removed":0`) || !strings.Contains(out.String(), `"committed":false`) {
+		t.Fatalf("unexpected no-op remove result: %s", out.String())
+	}
 
 	out.Reset()
 	errOut.Reset()

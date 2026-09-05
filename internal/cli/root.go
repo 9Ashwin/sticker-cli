@@ -272,7 +272,7 @@ func registerCommands(root *cobra.Command, registry *commandRegistry, options *r
 		if err := validateFavoriteList(cmd); err != nil {
 			return err
 		}
-		return placeholder(cmd, "favorites list")
+		return runFavoriteList(cmd.Context(), cmd, options)
 	})
 	addFavoriteCommand(favorites.Command, registry, favoriteDescribeMetadata(), func(cmd *cobra.Command, args []string) error {
 		if err := validateMD5ID(args[0], "ID"); err != nil {
@@ -281,13 +281,13 @@ func registerCommands(root *cobra.Command, registry *commandRegistry, options *r
 		if !cmd.Flags().Changed("caption") {
 			return validationError("invalid_argument", "--caption is required", "Provide the new personal caption.")
 		}
-		return placeholder(cmd, "favorites describe")
+		return runFavoriteDescribe(cmd.Context(), cmd, options, args[0])
 	})
 	addFavoriteCommand(favorites.Command, registry, favoriteRemoveMetadata(), func(cmd *cobra.Command, args []string) error {
 		if err := validateMD5IDs(args, "ID"); err != nil {
 			return err
 		}
-		return placeholder(cmd, "favorites remove")
+		return runFavoriteRemove(cmd.Context(), cmd, options, args)
 	})
 	addFavoriteCommand(favorites.Command, registry, favoriteImportMetadata(), func(cmd *cobra.Command, _ []string) error {
 		return placeholder(cmd, "favorites import")
