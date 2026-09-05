@@ -1,6 +1,6 @@
-# emoticon-cli
+# sticker-cli
 
-当前按 GitHub Issues 顺序实施。先阅读 tasks/prd-emoticon-cli.md 与 tasks/spec-emoticon-cli.md，以具体 Issue 的验收条件界定改动。
+当前按 GitHub Issues 顺序实施。先阅读 tasks/prd-sticker-cli.md 与 tasks/spec-sticker-cli.md，以具体 Issue 的验收条件界定改动。
 
 实现使用 Go + Cobra。代码、注释和面向用户的文档只描述本项目，不提及设计参考来源。每个 Issue 使用独立分支，验证和 review 后通过 PR 合并。
 

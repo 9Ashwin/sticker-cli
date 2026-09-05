@@ -5,7 +5,7 @@ import (
 	"os"
 	"os/signal"
 
-	"github.com/9Ashwin/emoticon-cli/internal/cli"
+	"github.com/9Ashwin/sticker-cli/internal/cli"
 )
 
 var version = "dev"

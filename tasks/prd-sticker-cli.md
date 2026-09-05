@@ -4,13 +4,13 @@
 
 ## 1. 背景与产品定位
 
-将原有表情素材与使用工具拆成两个独立仓库，让任何具备本地命令执行能力的 AI Agent 都能安装、搜索、读取和收藏表情包，不绑定 im-toolbox MCP、微信登录状态或特定 Agent 客户端。
+将原有表情素材与使用工具拆成两个独立仓库，让任何具备本地命令执行能力的 AI Agent 都能安装、搜索、读取和收藏表情包，不绑定特定 MCP 服务、微信登录状态或 Agent 客户端。
 
-现有 `9Ashwin/wechat-emoticon-pack` 已包含可离线使用的原图和清单。真正需要补齐的是统一 CLI、选择性安装、独立个人收藏以及机器可读的命令契约。
+现有素材仓库已包含可离线使用的原图和清单，计划统一归入 `9Ashwin/sticker-ext`。真正需要补齐的是统一 CLI、选择性安装、独立个人收藏以及机器可读的命令契约。
 
 ### 已确认需求
 
-- 独立 CLI 使用 **Go**，参考飞书官方 `larksuite/cli` 的实践。
+- 独立 CLI 使用 **Go**，采用成熟命令行项目的工程实践。
 - 拆成素材仓库与 CLI 仓库；现有素材仓库使用更合适的名字。
 - 用户可以选择安装精选或全量素材，不必先下载全库。
 - CLI 可以持续补充收藏的表情包，按现有素材库格式导入目标素材库。
@@ -28,14 +28,14 @@
 | 清单 | 根目录 `manifest.json`，`schema_version: 1` |
 | 图片路径 | `emoticons/<md5>.<format>` |
 | 清单字段 | `md5`、`sha256`、`filename`、`format`、`size`、`caption` |
-| 已有具体描述 | 125 张；其余多为粗粒度自动标签 |
-| 精选候选 | 排除 1 张描述明确模糊的图后为 124 张，22,821,282 字节，约 21.8 MiB |
+| 已有具体描述 | 2,638 张，当前素材主干已完成描述更新 |
+| 精选候选 | 画面复核后保留 120 张，21,703,567 字节，约 20.7 MiB |
 
-精选候选来自既有描述筛选，尚不代表 124 张均完成本轮人工画面复核。上线前需按场景、可读性和画面适宜性复核；最终数量不硬编码。
+精选候选来自描述筛选并已完成逐张画面复核，最终数量仍从清单读取，不在 CLI 中硬编码。全量描述更新后，检索验收应覆盖中文 caption、同义表达和空结果边界。
 
 ## 2. 目标
 
-1. 新用户安装 CLI 后，可以独立选择素材包；安装 CLI 本身下载 0 张素材。
+1. 新用户安装 CLI 后，可以独立选择素材包；安装 CLI 本身下载 0 张素材，并能通过 convenience setup 一次完成精选包初始化。
 2. 安装精选时只下载该包需要的原图；全量和精选共享的原图按内容复用。
 3. 安装完成后，断网仍能搜索、读取原图和维护私人收藏。
 4. 任何支持终端的 Agent 能通过 `--help` 和 `schema` 发现命令，解析 JSON 并获取可用的本地绝对路径。
@@ -46,14 +46,14 @@
 
 | 仓库 | 职责 | 不承载 |
 | --- | --- | --- |
-| `9Ashwin/emoticon-cli` | Go CLI、命令契约、安装发行、Agent Skill、测试与开发文档 | 公共图片全集、用户私人收藏、微信密钥 |
-| `9Ashwin/agent-emoticon-packs`（拟由现有仓库改名） | 原图、全量清单、精选清单、包目录与素材维护指南 | CLI 二进制、运行服务、用户个人数据 |
+| `9Ashwin/sticker-cli` | Go CLI、命令契约、安装发行、Agent Skill、测试与开发文档 | 公共图片全集、用户私人收藏、微信密钥 |
+| `9Ashwin/sticker-ext`（由现有素材仓库改名） | 原图、全量清单、精选清单、包目录与素材维护指南 | CLI 二进制、运行服务、用户个人数据 |
 
 个人收藏也是标准素材库：使用同样的 `manifest.json`（v1）和 `emoticons/`，添加或导入即向目标本地素材库合并原图与清单。不另创收藏专有文件格式。个人库与下载的公共包分开维护，但二者使用相同的交换格式。
 
 CLI 首次使用默认官方素材源，同时支持显式指定本地包目录和 HTTPS 包源。CLI 与素材版本独立更新。素材根目录现有 v1 清单继续有效，避免破坏兼容导入者。
 
-命令名采用 `emoticon`。新增 CLI 仓库公开，与现有公开素材仓库保持一致。素材仓库最终改名前集中更新 README、AGENTS、素材源及相关链接，不把永久依赖 GitHub 重定向当作迁移方案。
+命令名采用 `sticker`。新增 CLI 仓库公开，与现有公开素材仓库保持一致。素材仓库最终改名前集中更新 README、AGENTS、素材源及相关链接，不把永久依赖 GitHub 重定向当作迁移方案。
 
 ## 4. 用户故事
 
@@ -67,6 +67,7 @@ CLI 首次使用默认官方素材源，同时支持显式指定本地包目录�
 - [ ] 提供 `go install` 源码安装方式；`version` 显示版本。
 - [ ] CLI 安装过程不下载表情原图，不修改全局 Agent 指引。
 - [ ] 各平台提供安装与 PATH 说明，完成原生 smoke test；交叉编译单独报告。
+- [ ] 发布归档包含对应平台二进制、`checksums.txt` 和版本信息；安装入口默认写入用户目录、不要求 sudo，校验失败拒绝安装，Windows 提供 PowerShell 入口。
 
 ### US-002：Agent 自助发现命令
 
@@ -98,6 +99,7 @@ CLI 首次使用默认官方素材源，同时支持显式指定本地包目录�
 - [ ] 按大小、格式签名、MD5、SHA-256 校验原图；路径越界、重复冲突、损坏与超限文件明确失败。
 - [ ] 安装取消或部分下载失败不发布不完整的已安装包清单；重试可复用已验证的原图。
 - [ ] 单次安装使用一致的包修订，防止源在过程中更新导致混合快照。
+- [ ] `setup` 默认等价于 `packs install curated`，`--pack all` 才允许安装全量；可复用 `--source`、`--dry-run`，且不替代正式安装命令。
 
 ### US-005：离线搜索原图
 
@@ -117,6 +119,7 @@ CLI 首次使用默认官方素材源，同时支持显式指定本地包目录�
 **验收标准：**
 - [ ] `get <id>` 校验文件并返回绝对路径，文件不存在或损坏时返回恢复建议。
 - [ ] GIF 原始字节保持不变，不自动转成静态图。
+- [ ] 对客户端可能无法直接展示的静态 WebP，`get <id> --preview` 按需生成 PNG 预览路径；原图格式、MD5 和 SHA-256 保持不变，无法生成时返回稳定错误。
 - [ ] CLI 不把图片字节或大段 base64 注入 JSON；Skill 指引 Agent 先预览再展示。
 - [ ] 在支持本地文件展示的 Agent 客户端完成一次真实静态图及动图展示验证，并记录客户端能力差异。
 
@@ -147,7 +150,7 @@ CLI 首次使用默认官方素材源，同时支持显式指定本地包目录�
 **描述：** 作为已有素材的用户，我希望导入本地 `manifest.json` 及图片，复用既有收藏。
 
 **验收标准：**
-- [ ] 从现有 v1 清单目录导入目标本地素材库，合并到该库的 `manifest.json` 和 `emoticons/`，无需 `packs.json` 或运行 im-toolbox。
+- [ ] 从现有 v1 清单目录导入目标本地素材库，合并到该库的 `manifest.json` 和 `emoticons/`，无需 `packs.json` 或运行外部服务。
 - [ ] 逐项验证相对路径、格式、大小与两类哈希，并以内容去重。
 - [ ] 返回新增、跳过、冲突、失败计数；失败行为与是否部分生效写入命令契约。
 - [ ] 默认保护已有私人描述；覆盖描述需要显式参数。
@@ -189,10 +192,42 @@ CLI 首次使用默认官方素材源，同时支持显式指定本地包目录�
 **描述：** 作为 Agent 用户，我希望客户端加载简短 Skill 后即可使用 CLI。
 
 **验收标准：**
-- [ ] 发布 `skills/emoticon/SKILL.md`，说明选包、检索、预览、展示与收藏流程。
+- [ ] 发布 `skills/sticker/SKILL.md`，说明选包、检索、预览、展示、分组与整理流程。
 - [ ] 指引强调原图显示依赖客户端能力，不声称 CLI 已向聊天发送图片。
 - [ ] 安装 Skill 不覆盖用户已有指引；不同客户端的安装方式分别说明。
 - [ ] 至少一个支持终端的 Agent 完成“安装精选→检索→预览→展示→收藏”的真实验收。
+
+### US-014：收藏分类与自定义分组
+
+**描述：** 作为用户，我希望把收藏整理到自定义分组中，以便按场景浏览贴纸和表情。
+
+**验收标准：**
+- [ ] 提供默认收藏分组，以及创建、重命名、列出和删除自定义分组；删除分组前明确处理其中条目，不能静默丢失收藏。
+- [ ] 收藏条目可以加入或移出分组；同一原图只保存一份，分组变化不复制图片或破坏标准 `manifest.json`。
+- [ ] `favorites import` 继续接受只有 v1 `manifest.json` 与 `emoticons/` 的目录；可选的分组元数据缺失时所有条目进入默认收藏分组。
+- [ ] 分组元数据使用 CLI 自有版本化 JSON，校验 ID、名称、条目引用和路径，损坏时返回完整性错误而不覆盖有效数据。
+
+### US-015：收藏排序与批量整理
+
+**描述：** 作为用户，我希望在分组内调整顺序并批量移动或删除，以便快速完成类似微信的整理操作。
+
+**验收标准：**
+- [ ] `favorites list` 支持分组筛选和稳定排序：手动顺序、添加时间、caption 和 MD5；相同排序键有确定的次序。
+- [ ] 提供按 ID 批量移动、重排和取消收藏的非交互命令，支持 `--dry-run`，不因部分无效 ID 产生缺图或半提交状态。
+- [ ] 手动重排只更新分组元数据；并发修改通过原子提交保留另一方已成功写入的条目和顺序。
+- [ ] 导出包含可选分组与顺序元数据；旧客户端忽略该扩展仍可读取标准 v1 清单和原图。
+
+### US-016：端到端验证表情包使用流程
+
+**描述：** 作为 QA 工程师，我希望有一条自动化端到端测试覆盖素材安装、检索、读取和清单导入收藏的完整流程，以便在发布前发现跨命令和数据层回归。
+
+**验收标准：**
+- [ ] 自动化测试在临时数据目录和本地 fixture 素材源中执行“列出精选→安装精选→离线搜索→取得原图→按标准 v1 清单导入收藏→创建分组→排序并批量整理”的完整成功路径，并断言每一步的 JSON 输出、文件哈希、分组和最终清单内容。
+- [ ] 自动化测试覆盖关键失败路径：fixture 中的图片哈希不匹配时，安装返回稳定完整性错误、退出非零，且不发布不完整的安装清单。
+- [ ] 自动化测试覆盖分组元数据损坏和批量整理中的无效 ID，失败时有效收藏和顺序保持不变。
+- [ ] 自动化测试覆盖 `setup --pack curated`、显式本地 `sticker-ext` 源和发布校验失败；精选流程不能请求全量独有图片。
+- [ ] 测试在 CI 中运行并通过，不访问微信、MCP、账号凭据或真实公网素材源。
+- [ ] 测试每次创建并清理自己的临时目录和 fixture 状态，可单独重复运行而不依赖执行顺序。
 
 ## 5. 功能要求
 
@@ -212,78 +247,89 @@ CLI 首次使用默认官方素材源，同时支持显式指定本地包目录�
 - FR-14: 系统必须为素材安装、更新、卸载和收藏变更提供无写入的 dry-run。
 - FR-15: 系统必须阻止包路径逃逸到 CLI 数据目录之外。
 - FR-16: 系统必须保留原始动图字节。
+- FR-23: 系统必须为静态 WebP 提供显式的 PNG 预览路径，同时保留原始文件及其内容标识。
+- FR-24: 系统必须提供默认精选、全量显式选择的 `setup` convenience 命令，并复用正式素材安装合同。
+- FR-25: 系统必须发布带校验和的平台归档及无需 sudo 的版本固定安装入口，校验失败不得安装不可信二进制。
 - FR-17: 系统必须支持通过显式配置指定本地或 HTTPS 素材源。
 - FR-18: 系统必须在列表输出中提供有界分页。
+- FR-19: 系统必须为私人收藏提供版本化的分组元数据，且不改变标准 v1 清单的兼容性。
+- FR-20: 系统必须支持分组筛选、稳定手动顺序和确定性的添加时间、caption、MD5 排序。
+- FR-21: 系统必须支持收藏的批量移动、重排和取消，并提供 dry-run 与原子提交。
+- FR-22: 系统必须在 CI 中运行覆盖核心安装、检索、读取、清单导入和收藏整理路径的自动化端到端测试。
 
 ## 6. 命令与交互草案
 
 以下为设计示例，尚不可执行；精确选项和 schema 在技术设计阶段冻结。
 
 ```bash
-emoticon version
-emoticon --help
-emoticon schema packs install
-emoticon packs list
-emoticon packs install curated --dry-run
-emoticon packs install curated
-emoticon packs install all
-emoticon packs update curated
-emoticon packs remove curated --dry-run
-emoticon search '收到' --limit 5
-emoticon get <id>
-emoticon favorites add /path/to/original.gif --caption '白猫捧咖啡，咖啡续命'
-emoticon favorites add --id <id>
-emoticon favorites list
-emoticon favorites describe <id> --caption '新的描述'
-emoticon favorites remove <id> --dry-run
-emoticon favorites import /path/to/v1-pack
-emoticon favorites export /path/to/new-export
+sticker version
+sticker --help
+sticker schema packs install
+sticker packs list
+sticker packs install curated --dry-run
+sticker packs install curated
+sticker packs install all
+sticker packs update curated
+sticker packs remove curated --dry-run
+sticker search '收到' --limit 5
+sticker get <id>
+sticker favorites add /path/to/original.gif --caption '白猫捧咖啡，咖啡续命'
+sticker favorites add --id <id>
+sticker favorites list
+sticker favorites collections list
+sticker favorites collections create work
+sticker favorites organize --collection work --ids <id>... --dry-run
+sticker favorites list --collection work --sort manual
+sticker favorites describe <id> --caption '新的描述'
+sticker favorites remove <id> --dry-run
+sticker favorites import /path/to/v1-pack
+sticker favorites export /path/to/new-export
 ```
 
 默认非交互，供 Agent 和脚本使用；需要选择时返回可操作错误，不挂起等待 stdin。面向人的 `--format table` 可以辅助阅读，第一版不扩展 CSV、jq 或完整 TUI。
 
 成功参考 `{"ok":true,"data":{...},"meta":{...}}`；错误参考 `{"ok":false,"error":{"type":"validation","subtype":"invalid_argument","message":"...","hint":"..."}}`。成功退出码为 0，失败非零，禁止调用者按自然语言 message 分支。具体类型/退出码表在 SPEC 阶段冻结。
 
-## 7. Go 技术方向与飞书 CLI 实践
+## 7. Go 技术方向与命令行实践
 
-参考仓库：[larksuite/cli](https://github.com/larksuite/cli)。本轮读取的本地快照为 `7fd6ef3c07182257ce776cdc5a614e122d5bd4b3`，实际目录为 `/Users/mervyn/workspaces/github/cli`，不要求其他开发者拥有这个路径。
+本项目采用经过验证的 Go 命令行工程做法，重点是清晰的命令树、机器可读输出、稳定错误合同、可发现的 schema、dry-run 和跨平台原生发行。
 
-| 已核对的参考位置 | 本项目采用方式 |
+| 工程原则 | 本项目采用方式 |
 | --- | --- |
-| `go.mod`、`cmd/root.go` | Go + Cobra 命令树；命令层仅处理参数、输出和用例调用 |
-| `README.md` 的 JSON Output Contract、`internal/output/` | 默认 JSON envelope；成功 stdout、错误及进度 stderr；集中输出适配 |
-| `errs/ERROR_CONTRACT.md` | 稳定的 type/subtype、可操作 hint 和退出码；采用本地文件/网络/完整性相关的小型分类 |
-| `cmd/schema/schema.go` | 可机器发现的参数与返回结构；与 help 使用一致的命令元信息 |
-| README 的 Dry Run、`AGENTS.md` | 写入前可查看效果；校验与副作用边界清晰，命令契约有回归测试 |
-| `skills/`、`affordance/` | 跨命令工作流放 Skill，每条命令的具体使用条件放帮助 |
-| `package.json`、`scripts/install.js` | 参考原生二进制分发方式；npm 包装安装器放后续阶段 |
+| 单一命令注册来源 | Go + Cobra 命令树；命令层仅处理参数、输出和用例调用 |
+| 机器可读输出 | 默认 JSON envelope；成功 stdout、错误及进度 stderr；集中输出适配 |
+| 稳定错误合同 | 稳定的 type/subtype、可操作 hint 和退出码；采用本地文件/网络/完整性相关的小型分类 |
+| 可发现性 | `schema` 提供参数与返回结构；与 help 使用一致的命令元信息 |
+| 可控副作用 | 写入前可查看效果；校验与副作用边界清晰，命令契约有回归测试 |
+| 工作流指引 | 跨命令工作流放 Skill，每条命令的具体使用条件放帮助 |
+| 原生发行 | 优先提供原生二进制；包管理器包装安装器放后续阶段 |
 
-仅采用当前问题需要的部分：不复制飞书 OAuth、动态 OpenAPI 生成、租户隔离、三层 API 命令体系、插件框架或大型服务目录。
+只实现当前问题需要的能力，不引入 OAuth、动态 API 生成、租户隔离、插件框架或大型服务目录。
 
 建议最低 Go 版本在实施时选受支持稳定版并固定于 go.mod 和 CI；第三方依赖优先 Cobra，其余先使用标准库。运行产物必须能 `CGO_ENABLED=0` 构建。
 
 存储使用现有素材库格式：根目录 v1 `manifest.json` 配合 `emoticons/<md5>.<format>`。个人收藏、导入目标和导出包均沿用此格式；可以另存安装来源等 CLI 管理信息，但不把它作为读取用户素材的必要条件。当前数千条规模不强制引入数据库。具体原子发布、并发写保护、版本固定、共享文件引用及回收语义在 SPEC 明确。
 
-数据目录建议 `--home` 优先于 `EMOTICON_HOME`，再使用系统用户数据目录；禁止硬编码开发者用户名。HTTPS 下载须校验证书、限制重定向、单图大小、清单大小、超时和重试预算。校验内容哈希不等于审核画面准确性。
+数据目录建议 `--home` 优先于 `STICKER_HOME`，再使用系统用户数据目录；禁止硬编码开发者用户名。HTTPS 下载须校验证书、限制重定向、单图大小、清单大小、超时和重试预算。校验内容哈希不等于审核画面准确性。
 
 ## 8. 不在首期范围
 
 - 直接读取微信数据库、解密图片、提取账号密钥或依赖 MCP 才能运行。
-- 自动向微信、飞书或其他聊天发送图片。
+- 自动向微信或其他聊天发送图片。
 - 默认自动同步远程收藏、自动上传私人素材或自动提交公共仓库。
 - 向量数据库、云端语义检索、自动视觉标注或图片生成。
 - Web/TUI 素材管理器、跨账号收藏同步、插件平台。
 - 首期同时覆盖 Homebrew、npm、winget 等全部包管理器。
 
-用户已确认：首期按现有素材库格式导入本地原图或清单即可；直接从 im-toolbox/微信迁移留到后续，不让默认 CLI 依赖 MCP。
+用户已确认：首期按现有素材库格式导入本地原图或清单即可；直接从微信数据服务迁移留到后续，不让默认 CLI 依赖 MCP。
 
 ## 9. 分期与完成标准
 
 | 阶段 | 工作 | 通过条件 |
 | --- | --- | --- |
 | P0：规划 | 本 PRD、仓库分工、命名与范围评审 | 用户确认 PRD，再决定 SPEC 与 Issues |
-| P1：首个可用闭环 | US-001–007、US-009、US-012–013；命令契约、精选/全量、搜索、读取、添加与清单导入 | 全新机器的 Agent 可以完成选包、离线检索、展示与收藏 |
-| P2：收藏迁移与生命周期 | US-008、US-010–011；描述修改、导出、更新卸载 | round-trip 迁移和更新/卸载保留收藏测试通过 |
+| P1：首个可用闭环 | US-001–007、US-009、US-012、US-014–016；命令契约、精选/全量、搜索、读取、添加、清单导入和收藏整理 | 全新机器的 Agent 可以完成选包、离线检索、展示、收藏和分组整理，CI 端到端测试通过 |
+| P2：收藏迁移与生命周期 | US-008、US-010–011；描述修改、导出、更新和卸载 | round-trip 迁移和更新/卸载保留收藏测试通过 |
 | P3：分发优化（后续） | 依据使用反馈增加 npm/Homebrew、下载加速、扩展主题包 | 单独评估需求后规划，不阻塞首版 |
 
 实现前为各故事拆出依赖与小任务。此 PRD 不自动创建 Issues，不代表 P1/P2 已开始实施。
@@ -297,16 +343,19 @@ emoticon favorites export /path/to/new-export
 - 收藏导出→新库导入后，条目数、描述、原始文件哈希完全一致。
 - 中断、损坏文件、路径穿越、磁盘写失败、并发修改均有回归场景；已提交数据不丢失。
 - 公共包更新/卸载后的私人收藏可用性测试通过。
+- 分组创建、排序、批量移动和取消后的收藏顺序及原图哈希保持一致。
+- 静态 WebP 的按需预览不会修改原图字节或清单中的内容标识；不支持转换时返回稳定错误。
+- `setup --pack curated` 的执行结果与正式精选安装一致，使用本地 `sticker-ext` 源时不读取全量独有文件。
 - Go 单测、vet、lint、race 与无 CGO 构建通过；目标平台运行验收与交叉编译分开记录。
 - 至少一个真实 Agent 完成显示验证，命令成功不能替代客户端 QA。
 
 ## 11. 待评审事项
 
-1. 已确认命名：CLI `emoticon-cli` / 命令 `emoticon`，素材 `agent-emoticon-packs`；素材远端改名随素材迁移任务执行。
+1. 已确认命名：CLI `sticker-cli` / 命令 `sticker`，素材 `sticker-ext`；两个远端仓库均已按此命名规划迁移。
 2. 已确认首期收藏入口：本地原图、已安装条目和 v1 清单，统一合并到现有素材库格式；微信/MCP 直接迁移后续做。
-3. 精选候选 124 张需发布前画面复核；是否另有必须包含的角色或使用场景，可在维护清单时补充。
+3. 精选清单当前为 120 张，后续新增或替换素材仍需逐张复核；是否另有必须包含的角色或使用场景，可在维护清单时补充。
 4. 原图版权保持各自声明；CLI 代码许可证在首次代码发布前明确，不将代码许可套用到素材。
 
 ## 12. 下一步
 
-需求已确认。[技术 SPEC](spec-emoticon-cli.md) 与 [18 项实施 Issues](issues-emoticon-cli.md) 已就绪，后续按依赖顺序实施。
+需求已确认。根据新版 Skill 和微信式整理需求，已补充收藏分组/排序/批量整理故事，并将 US-016 保持为最后的自动化 E2E 故事；[技术 SPEC](spec-sticker-cli.md) 与 [实施 Issues](issues-sticker-cli.md) 将同步这些验收后按依赖顺序实施。

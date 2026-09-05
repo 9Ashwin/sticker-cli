@@ -19,12 +19,12 @@ jobs:
           go-version: '1.26.8'
       - run: go test -race ./...
       - run: go vet ./...
-      - run: go build -o emoticon${{ runner.os == 'Windows' && '.exe' || '' }} ./cmd/emoticon
+      - run: go build -o sticker${{ runner.os == 'Windows' && '.exe' || '' }} ./cmd/sticker
         env:
           CGO_ENABLED: '0'
       - name: Smoke test
         shell: bash
-        run: ./emoticon${{ runner.os == 'Windows' && '.exe' || '' }} version
+        run: ./sticker${{ runner.os == 'Windows' && '.exe' || '' }} version
   quality:
     runs-on: ubuntu-latest
     steps:
