@@ -123,7 +123,7 @@ npx --yes skills add https://github.com/9Ashwin/sticker-cli/tree/main \
 `scripts/install.sh` 和 `scripts/install.ps1` 支持 `--skill-dir`/`-SkillDir` 或
 `STICKER_SKILL_DIR` 指定直接安装位置；安装器不会覆盖已有的 `sticker` Skill。
 
-版本 tag 触发发布工作流后，会为 Linux amd64/arm64、macOS amd64/arm64 和 Windows amd64 生成带 SHA-256 校验的归档；归档只含程序、版本/校验文件和许可证，不包含原图。仓库尚未发布首个 Release 时，一键脚本会明确提示使用 `go install github.com/9Ashwin/sticker-cli/cmd/sticker@latest`，发布后即可直接使用上面的命令。
+版本 tag 触发发布工作流后，会为 Linux amd64/arm64、macOS amd64/arm64 和 Windows amd64 生成带 SHA-256 校验的归档；归档只含程序、版本/校验文件和许可证，不包含原图。当前稳定版是 [`v0.1.0`](https://github.com/9Ashwin/sticker-cli/releases/tag/v0.1.0)，一键脚本会自动选择最新稳定版。
 
 ### 2. 选择表情包素材
 
