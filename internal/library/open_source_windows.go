@@ -25,5 +25,12 @@ func validateSourceSymlinks(original, canonical string) error {
 }
 
 func sameWindowsPath(first, second string) bool {
-	return filepath.Clean(first) == filepath.Clean(second)
+	firstInfo, firstErr := os.Stat(first)
+	secondInfo, secondErr := os.Stat(second)
+	if firstErr != nil || secondErr != nil {
+		return false
+	}
+	// File identity also covers the short-name and canonical-casing aliases
+	// returned by EvalSymlinks on Windows.
+	return os.SameFile(firstInfo, secondInfo)
 }

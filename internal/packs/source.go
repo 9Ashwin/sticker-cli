@@ -41,12 +41,26 @@ func Resolve(raw string) (Source, error) {
 	if strings.HasPrefix(strings.ToLower(raw), "http://") {
 		return Source{}, newError("validation", "invalid_argument", "source must use HTTPS", "Use an HTTPS source URL.")
 	}
+	if isLocalSourcePath(raw) {
+		return resolveLocalSource(raw)
+	}
 	if parsed, err := url.Parse(raw); err == nil && parsed.Scheme != "" {
 		return resolveURLSource(parsed)
 	}
 	if strings.HasPrefix(raw, "//") || strings.Contains(raw, "\\") {
 		return Source{}, newError("validation", "invalid_argument", "source must be an HTTPS URL or local directory", "Use an absolute or relative local directory path.")
 	}
+	return resolveLocalSource(raw)
+}
+
+func isLocalSourcePath(raw string) bool {
+	if filepath.IsAbs(raw) || filepath.VolumeName(raw) != "" {
+		return true
+	}
+	return filepath.Separator == '\\' && strings.ContainsRune(raw, '\\') && !strings.Contains(raw, "://")
+}
+
+func resolveLocalSource(raw string) (Source, error) {
 	abs, err := filepath.Abs(raw)
 	if err != nil {
 		return Source{}, wrapError("validation", "unsafe_path", "cannot resolve source directory", "Use a valid local directory path.", err)
