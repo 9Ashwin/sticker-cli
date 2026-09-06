@@ -33,10 +33,11 @@ type Options struct {
 
 // Result is the bounded, resumable search response.
 type Result struct {
-	Items      []Item `json:"items"`
-	Total      int    `json:"total"`
-	NextOffset int    `json:"next_offset"`
-	HasMore    bool   `json:"has_more"`
+	Items         []Item `json:"items"`
+	Total         int    `json:"total"`
+	NextOffset    int    `json:"next_offset"`
+	HasMore       bool   `json:"has_more"`
+	SetupRequired bool   `json:"setup_required,omitempty"`
 }
 
 // Item is the metadata returned for a searchable image. Search deliberately
@@ -129,7 +130,13 @@ func Execute(ctx context.Context, options Options) (Result, error) {
 		filtered = append(filtered, item)
 	}
 
-	result := Result{Items: make([]Item, 0), Total: len(filtered), NextOffset: options.Offset, HasMore: false}
+	result := Result{
+		Items:         make([]Item, 0),
+		Total:         len(filtered),
+		NextOffset:    options.Offset,
+		HasMore:       false,
+		SetupRequired: options.Pack == "" && len(selectedPacks) == 0 && len(personal.Items) == 0,
+	}
 	if options.Offset < len(filtered) {
 		end := min(options.Offset+options.Limit, len(filtered))
 		result.Items = append(result.Items, filtered[options.Offset:end]...)

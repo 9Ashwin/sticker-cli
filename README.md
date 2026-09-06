@@ -10,7 +10,7 @@
 
 `sticker-cli` 把程序、表情包素材和个人收藏分开管理。它在本地完成选包、搜索、原图校验、预览和收藏整理，不要求微信账号、MCP 服务或常驻网络连接；任何能运行 CLI 的 Agent 都可以通过稳定的 JSON 合同使用它。
 
-默认策略是安装 CLI 时不下载原图；首次执行 `sticker setup` 会安装 `curated` 精选表情包。只有显式传入 `--pack all` 才下载全量素材。
+默认策略是安装 CLI 时不下载原图；首次执行 `sticker setup` 会安装 `curated` 精选表情包。只有显式传入 `--pack all` 才下载全量素材。安装器始终安装 `sticker` Skill，避免出现“命令已安装但 Agent 不会触发”的半成品状态。
 
 ## 你可以用它做什么
 
@@ -44,13 +44,31 @@ Windows PowerShell：
 irm https://raw.githubusercontent.com/9Ashwin/sticker-cli/main/scripts/install.ps1 | iex
 ```
 
+要在安装时同时初始化精选表情包：
+
+```powershell
+$installer = irm https://raw.githubusercontent.com/9Ashwin/sticker-cli/main/scripts/install.ps1
+& ([scriptblock]::Create($installer)) -Pack curated
+```
+
 一键入口会校验并安装当前稳定版 CLI，同时把 `sticker` Skill 安装到支持的 Agent
-客户端；它不会下载任何表情原图。已有 Skill 会保留，纯二进制安装可以显式跳过：
+客户端；默认不会下载表情原图。已有 Skill 会保留。想在同一条命令中完成精选包初始化时，显式传入 `--pack curated`：
 
 ```bash
 curl --proto '=https' --tlsv1.2 -fsSL \
-  https://raw.githubusercontent.com/9Ashwin/sticker-cli/main/scripts/install.sh | bash -s -- --no-skill
+  https://raw.githubusercontent.com/9Ashwin/sticker-cli/main/scripts/install.sh | bash -s -- --pack curated
 ```
+
+`--pack all` 会下载完整素材；也可以配合 `--source /path/to/sticker-ext` 使用本地
+素材源，例如：
+
+```bash
+curl --proto '=https' --tlsv1.2 -fsSL \
+  https://raw.githubusercontent.com/9Ashwin/sticker-cli/main/scripts/install.sh | \
+  bash -s -- --pack curated --source /path/to/sticker-ext
+```
+
+Skill 始终会安装或保留。
 
 #### Agent 快速开始
 
@@ -105,7 +123,7 @@ npx --yes skills add https://github.com/9Ashwin/sticker-cli/tree/main \
 `scripts/install.sh` 和 `scripts/install.ps1` 支持 `--skill-dir`/`-SkillDir` 或
 `STICKER_SKILL_DIR` 指定直接安装位置；安装器不会覆盖已有的 `sticker` Skill。
 
-版本 tag 触发发布工作流后，会为 Linux amd64/arm64、macOS amd64/arm64 和 Windows amd64 生成带 SHA-256 校验的归档；归档只含程序、版本/校验文件和许可证，不包含原图。
+版本 tag 触发发布工作流后，会为 Linux amd64/arm64、macOS amd64/arm64 和 Windows amd64 生成带 SHA-256 校验的归档；归档只含程序、版本/校验文件和许可证，不包含原图。仓库尚未发布首个 Release 时，一键脚本会明确提示使用 `go install github.com/9Ashwin/sticker-cli/cmd/sticker@latest`，发布后即可直接使用上面的命令。
 
 ### 2. 选择表情包素材
 
@@ -116,6 +134,15 @@ git clone https://github.com/9Ashwin/sticker-ext.git
 sticker packs list --source /path/to/sticker-ext
 sticker setup --source /path/to/sticker-ext
 ```
+
+如果本机无法访问默认 HTTPS 源，可以把本地 checkout 固定为默认来源，之后不必重复传参：
+
+```bash
+export STICKER_PACK_SOURCE=/path/to/sticker-ext
+sticker setup
+```
+
+`--source` 优先于 `STICKER_PACK_SOURCE`；安装成功后，更新命令还会使用已保存的来源。
 
 `setup` 默认安装 `curated` 精选包（120 张，约 20.7 MiB）。需要完整素材时必须显式选择 `all`（2,638 张，约 1 GiB）：
 
@@ -142,6 +169,9 @@ sticker search "调皮" --limit 8
 sticker search "工作" --pack curated --limit 8
 sticker get <id>
 ```
+
+全新数据目录第一次搜索会在成功包络中返回 `data.setup_required: true`。Agent 应按提示
+执行 `sticker setup`（默认精选），再重试原始搜索；这不会把“没有匹配结果”和“还没有素材包”混在一起。
 
 `get` 会先验证文件内容，再返回 `data.item.path`。静态 WebP 需要兼容预览时：
 

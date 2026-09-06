@@ -38,26 +38,31 @@ WebP 才可以使用生成的预览路径。
 
 ### 首次使用
 
-如果 `sticker search` 报告没有已安装素材包，先运行 `sticker packs list`，除非
-用户明确要求全量，否则只安装精选包：
+先执行搜索。如果返回的 `data.setup_required` 为 `true`，说明本地还没有素材包；除非
+用户明确要求全量，否则直接安装精选包并重试原始搜索：
 
 ```bash
 sticker setup --pack curated
 ```
 
 用户提供本地 `sticker-ext` checkout 时，用 `--source /path/to/sticker-ext` 指定
-来源。安装完成后重试原始搜索；之后搜索和展示都可以离线完成。
+来源，也可以设置 `STICKER_PACK_SOURCE` 作为默认来源。安装完成后重试原始搜索；之后
+搜索和展示都可以离线完成。
 
 ## Install the skill safely
 
 This directory can be copied into any Agent client that loads `SKILL.md` files.
 For a release installation that includes both the CLI and this Skill, use the
-platform installer; it does not download sticker images:
+platform installer; the Skill is always installed or preserved:
 
 ```bash
 curl --proto '=https' --tlsv1.2 -fsSL \
   https://raw.githubusercontent.com/9Ashwin/sticker-cli/main/scripts/install.sh | bash
 ```
+
+To initialize the default curated pack in the same invocation, append
+`| bash -s -- --pack curated`. Use `--pack all` only when the full pack is wanted.
+The installer always installs or preserves the Skill.
 
 Use the repository helper with the client's skill directory as its argument:
 
@@ -77,7 +82,8 @@ go install github.com/9Ashwin/sticker-cli/cmd/sticker@latest
 ## Select and install a pack
 
 Choose a pack explicitly. `setup` is the short path and defaults to the
-curated pack; use `--pack all` only when the full pack is wanted.
+curated pack; use `--pack all` only when the full pack is wanted. Set
+`STICKER_PACK_SOURCE` when the default HTTPS source is not reachable.
 
 ```bash
 sticker packs list --source /path/to/sticker-ext

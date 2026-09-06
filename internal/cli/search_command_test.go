@@ -83,3 +83,26 @@ func TestSearchCommandMapsMissingPackError(t *testing.T) {
 		t.Fatalf("unexpected missing pack error: %s", errOut.String())
 	}
 }
+
+func TestSearchCommandSignalsFirstRunSetup(t *testing.T) {
+	var out, errOut bytes.Buffer
+	if code := Run(context.Background(), []string{"--home", t.TempDir(), "search", "调皮"}, &out, &errOut, "dev", "test"); code != 0 {
+		t.Fatalf("empty-library search exit %d stdout=%q stderr=%q", code, out.String(), errOut.String())
+	}
+	var envelope struct {
+		OK   bool `json:"ok"`
+		Data struct {
+			SetupRequired bool `json:"setup_required"`
+			Total         int  `json:"total"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(out.Bytes(), &envelope); err != nil {
+		t.Fatal(err)
+	}
+	if !envelope.OK || !envelope.Data.SetupRequired || envelope.Data.Total != 0 {
+		t.Fatalf("unexpected first-run search response: %s", out.String())
+	}
+	if errOut.Len() != 0 {
+		t.Fatalf("unexpected stderr: %s", errOut.String())
+	}
+}

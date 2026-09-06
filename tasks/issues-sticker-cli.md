@@ -124,7 +124,7 @@ GitHub：[9Ashwin/sticker-cli#4](https://github.com/9Ashwin/sticker-cli/issues/4
 
 验收：
 
-- [ ] 实现 packs list 的官方 HTTPS、本地目录与显式 --source。
+- [ ] 实现 packs list 的官方 HTTPS、本地目录与显式 --source；CLI 读取 `STICKER_PACK_SOURCE` 作为未传参数时的默认来源。
 - [ ] 列出包描述、修订、大小、安装状态；请求目录不下载图片。
 - [ ] 缓存按 source 区分，--offline 显示 fetched_at/stale，空缓存报明确错误。
 - [ ] 拒绝目录越界、非法 source 与冲突字段，网络处理有超时/重试预算。
@@ -178,7 +178,7 @@ GitHub：[9Ashwin/sticker-cli#7](https://github.com/9Ashwin/sticker-cli/issues/7
 - [ ] 合并个人清单与包清单，按内容去重，执行指定 caption 优先级。
 - [ ] 支持 --pack/--favorites 交集、大小写不敏感子串查询及 MD5 稳定排序。
 - [ ] 对 fixture 中覆盖多个条目的宽泛场景词返回一组候选；验收不依赖情绪分类器或唯一语义命中。
-- [ ] 提供 limit/offset/next_offset/has_more，空结果成功，超限输出仍可续查。
+- [ ] 提供 limit/offset/next_offset/has_more，空结果成功，超限输出仍可续查；空个人库且没有已安装包时标记 `setup_required: true`。
 - [ ] 验证离线零网络及 2,638 条基线性能，报告测量值而非预设达标。
 
 相关实现运行聚焦回归、Go test/vet/lint；并发和文件提交增加 race 与目标平台验证。素材任务运行清单/原图校验及文档链接检查。
@@ -313,7 +313,7 @@ GitHub：[9Ashwin/sticker-cli#15](https://github.com/9Ashwin/sticker-cli/issues/
 - [ ] 提供 go install 与各平台 PATH 文档，安装程序本身零素材下载。
 - [ ] 固定代码许可证后发布，原图不打进 CLI Release。
 - [ ] 测试单二进制无 Go/Node/Python/MCP 运行依赖；原生 smoke 与交叉编译分开记录。
-- [ ] 发布版本固定的跨平台归档、`checksums.txt`、Unix shell 和 Windows PowerShell 安装入口；默认写入用户目录、无需 sudo，一键入口默认安装 CLI 与 Skill，校验失败拒绝安装且不把原图打进归档。
+- [ ] 发布版本固定的跨平台归档、`checksums.txt`、Unix shell 和 Windows PowerShell 安装入口；默认写入用户目录、无需 sudo，一键入口始终安装或保留 CLI 与 Skill，可选 `--pack`/`-Pack` 初始化素材，校验失败拒绝安装且不把原图打进归档。
 
 相关实现运行聚焦回归、Go test/vet/lint；并发和文件提交增加 race 与目标平台验证。素材任务运行清单/原图校验及文档链接检查。
 
@@ -328,7 +328,7 @@ GitHub：[9Ashwin/sticker-cli#16](https://github.com/9Ashwin/sticker-cli/issues/
 验收：
 
 - [ ] 发布简短 Agent Skill：选包、检索、预览、展示、收藏、分组及批量整理。
-- [ ] Skill 同时说明 `setup --pack curated|all` convenience，并明确正式 `packs install` 和本地 `favorites import` 接口。
+- [ ] Skill 同时说明 `setup --pack curated|all` convenience、`setup_required` 首次初始化信号和 `STICKER_PACK_SOURCE` 本地来源，并明确正式 `packs install` 和本地 `favorites import` 接口。
 - [ ] 示例与 help/schema 一致，Skill 安装不覆盖用户已有指引。
 - [ ] 至少一个真实 Agent 完成精选安装→离线检索→预览展示→收藏→分组排序→批量整理流程。
 - [ ] 文件可用、静态预览和动画播放分开报告，不宣称外部聊天发送。
