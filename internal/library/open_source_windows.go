@@ -5,6 +5,7 @@ package library
 import (
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 func openAbsoluteNoFollow(path string) (*os.File, error) {
@@ -25,5 +26,6 @@ func validateSourceSymlinks(original, canonical string) error {
 }
 
 func sameWindowsPath(first, second string) bool {
-	return filepath.Clean(first) == filepath.Clean(second)
+	// EvalSymlinks returns the filesystem's canonical casing on Windows.
+	return strings.EqualFold(filepath.Clean(first), filepath.Clean(second))
 }
