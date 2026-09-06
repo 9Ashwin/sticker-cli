@@ -50,7 +50,7 @@ func TestSchemaListsCommands(t *testing.T) {
 	if err := json.Unmarshal(out.Bytes(), &envelope); err != nil {
 		t.Fatal(err)
 	}
-	if !envelope.OK || !contains(envelope.Data.Commands, "help") || !contains(envelope.Data.Commands, "setup") || !contains(envelope.Data.Commands, "packs install") || !contains(envelope.Data.Commands, "favorites import") || !contains(envelope.Data.Commands, "favorites collections create") || !contains(envelope.Data.Commands, "favorites organize") || contains(envelope.Data.Commands, "completion") || contains(envelope.Data.Commands, "packs") || contains(envelope.Data.Commands, "favorites") || contains(envelope.Data.Commands, "favorites collections") {
+	if !envelope.OK || !contains(envelope.Data.Commands, "help") || !contains(envelope.Data.Commands, "setup") || !contains(envelope.Data.Commands, "packs install") || !contains(envelope.Data.Commands, "packs repair") || !contains(envelope.Data.Commands, "favorites import") || !contains(envelope.Data.Commands, "favorites collections create") || !contains(envelope.Data.Commands, "favorites organize") || contains(envelope.Data.Commands, "completion") || contains(envelope.Data.Commands, "packs") || contains(envelope.Data.Commands, "favorites") || contains(envelope.Data.Commands, "favorites collections") {
 		t.Fatalf("unexpected command list: %s", out.String())
 	}
 	if errOut.Len() != 0 {

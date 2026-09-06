@@ -103,6 +103,18 @@ Use `--home /path/to/local-library` or `STICKER_HOME` to select the local
 library. After installation, search, get, and favorites operations are local
 and do not need the source directory or a network connection.
 
+If an older or interrupted CLI leaves a pack state that fails with
+`integrity/invalid_collection`, clear only that state before reinstalling:
+
+```bash
+sticker packs repair all --dry-run
+sticker packs repair all
+sticker packs install all --source /path/to/sticker-ext
+```
+
+Repair removes the invalid `.sticker/packs/<id>.json` state and keeps original
+images and personal favorites. It leaves a valid state untouched.
+
 ## Search, preview, and display
 
 Search captions with broad scene words and inspect several candidates. Captions

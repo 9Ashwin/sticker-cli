@@ -51,7 +51,7 @@
 - 默认输出 JSON 包络 `{"ok":true,"data":{...},"meta":{"schema_version":1}}`；`--format table` 只用于人读，`--json` 是兼容别名。
 - 失败写 stderr、stdout 为空，稳定返回 `type`、`subtype` 和退出码；不要让 message 文案成为 Agent 分支依据。
 - 命令默认非交互，不隐式等待 stdin。需要机器发现时使用 `sticker schema [command...]`，帮助和 schema 必须与真实参数保持一致。
-- `setup` 默认只安装 `curated`；只有显式 `--pack all` 才选择全量。正式 `packs install`、`setup` 和本地素材源必须共享修订、校验、锁和原子提交语义。
+- `setup` 默认只安装 `curated`；只有显式 `--pack all` 才选择全量。正式 `packs install`、`setup` 和本地素材源必须共享修订、校验、锁和原子提交语义。`packs repair <id>` 只清理损坏的包状态并保留原图，合法状态不得被修复命令删除。
 - 全新数据目录的 `search` 仍返回成功的空列表，但应在 `data.setup_required:true` 标记尚未安装素材包；普通无匹配结果不能带这个标记。Skill 和 Agent 应据此执行 `sticker setup --pack curated` 后重试原始查询。
 - 搜索按 caption 的宽泛、不区分英文大小写的子串匹配返回候选，不承诺唯一情绪或唯一语义命中；分页和排序键必须稳定。
 - `get` 返回经过完整性校验的绝对原图路径；`--preview` 只为静态 WebP 生成或复用 PNG，不嵌入图片字节。

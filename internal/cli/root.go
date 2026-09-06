@@ -172,6 +172,12 @@ func registerCommands(root *cobra.Command, registry *commandRegistry, options *r
 		}
 		return runPackRemove(cmd, options, args)
 	})
+	addPackCommand(packs.Command, registry, packRepairMetadata(), func(cmd *cobra.Command, args []string) error {
+		if err := validatePackID(args[0]); err != nil {
+			return err
+		}
+		return runPackRepair(cmd, options, args)
+	})
 
 	search := newCommand(searchMetadata())
 	search.Command.RunE = func(cmd *cobra.Command, args []string) error {
