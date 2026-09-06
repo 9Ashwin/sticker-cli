@@ -2,10 +2,20 @@
 
 package library
 
-import "testing"
+import (
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+)
 
-func TestSameWindowsPathIgnoresCase(t *testing.T) {
-	if !sameWindowsPath(`C:\Users\Runner\Temp\Image.GIF`, `c:/users/runner/temp/image.gif`) {
-		t.Fatal("Windows path comparison should ignore case and separator style")
+func TestSameWindowsPathAcceptsFilesystemAliases(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "Image.GIF")
+	if err := os.WriteFile(path, []byte("fixture"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	alias := strings.ToLower(filepath.ToSlash(path))
+	if !sameWindowsPath(path, alias) {
+		t.Fatalf("Windows path aliases should identify the same file: %q and %q", path, alias)
 	}
 }
