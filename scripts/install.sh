@@ -48,7 +48,7 @@ while [[ $# -gt 0 ]]; do
       fail "unknown option: $1"
       ;;
     *)
-      [[ -z "$version" ]] || fail "release version specified more than once"
+      [[ -z "$version" || "$version" == "$1" ]] || fail "release version specified more than once"
       version=$1
       ;;
   esac

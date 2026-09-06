@@ -317,6 +317,34 @@ func TestInstallCopiesOriginalAndPublishesState(t *testing.T) {
 	}
 }
 
+func TestEncodeInstalledStatePreservesManifestBytes(t *testing.T) {
+	manifest := []byte("{\n  \"schema_version\": 1,\n  \"collection\": \"curated\",\n  \"items\": []\n}\n")
+	home := t.TempDir()
+	stateDir := filepath.Join(home, ".sticker", "packs")
+	if err := os.MkdirAll(stateDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	data, err := encodeInstalledState(installedState{
+		SchemaVersion: 1,
+		ID:            "curated",
+		Source:        filepath.Join(t.TempDir(), "source"),
+		Revision:      hashText(manifest),
+		InstalledAt:   time.Now().UTC(),
+		Manifest:      manifest,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeFixtureFile(t, filepath.Join(stateDir, "curated.json"), data)
+	state, installed, err := readInstalledState(home, "curated")
+	if err != nil || !installed {
+		t.Fatalf("encoded state was not accepted: %+v, %v, %v", state, installed, err)
+	}
+	if string(state.Manifest) != string(manifest) {
+		t.Fatalf("manifest bytes changed during state encoding: got %q want %q", state.Manifest, manifest)
+	}
+}
+
 func TestInstallHTTPSFetchesOnlySelectedPackImages(t *testing.T) {
 	fixture := newInstallFixture(t)
 	allContent := []byte("GIF89a all-only fixture")

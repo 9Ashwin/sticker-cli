@@ -471,6 +471,9 @@ type installedState struct {
 	Revision      string          `json:"revision"`
 	InstalledAt   time.Time       `json:"installed_at"`
 	Manifest      json.RawMessage `json:"manifest"`
+	// ManifestRaw keeps the exact source bytes used by Revision. Manifest is
+	// retained for compatibility with states written before this field existed.
+	ManifestRaw []byte `json:"manifest_raw,omitempty"`
 }
 
 func withInstalledState(home string, source Source, result Result) (Result, error) {
