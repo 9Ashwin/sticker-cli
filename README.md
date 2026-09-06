@@ -270,6 +270,20 @@ sticker --help
 
 一个典型的 Agent 流程是：安装精选包 → 用场景词搜索多个候选 → 对选中的 ID 调用 `get` → 展示返回的本地路径 → 用 `favorites add` 或标准 v1 目录导入 → 创建分组并用 `organize --dry-run` 预览整理。
 
+## 实际效果
+
+安装 Skill 后，Agent 可以根据聊天内容直接选出并展示表情包：
+
+<p align="center">
+  <img src="assets/agent-chat-demo.png" alt="Agent 在聊天中展示表情包" width="640">
+</p>
+<p align="center"><em>根据聊天上下文自然地发出表情包</em></p>
+
+<p align="center">
+  <img src="assets/agent-install-demo.png" alt="Agent 安装 CLI 和精选表情包并展示结果" width="520">
+</p>
+<p align="center"><em>安装 CLI、初始化精选包并展示结果</em></p>
+
 ## 本地数据和素材边界
 
 默认数据目录是 `--home`、`STICKER_HOME` 或系统用户配置目录下的 `sticker`，优先级从左到右。个人素材库的标准结构为：
