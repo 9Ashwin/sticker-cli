@@ -2,7 +2,7 @@
 
 ## 项目概览
 
-`sticker-cli` 是一个纯 Go 的本地 sticker CLI，面向人和 AI Agent 提供选包、搜索、原图校验、预览、收藏导入导出以及收藏整理。程序和公共素材分开发布；运行 CLI 不需要微信账号、MCP 服务或常驻网络。
+`sticker-cli` 是一个面向 AI Agent 的纯 Go 本地表情包 CLI，目标是让 Agent 在聊天中自然地搜索、选择和展示表情包；同时提供选包、原图校验、预览、收藏导入导出以及收藏整理。程序和公共素材分开发布；运行 CLI 不需要微信账号、MCP 服务或常驻网络。
 
 公共素材位于独立的 [sticker-ext](https://github.com/9Ashwin/sticker-ext) 仓库。本仓库只维护 CLI、Agent Skill、发布脚本和测试，不提交原图全集或私人收藏。
 

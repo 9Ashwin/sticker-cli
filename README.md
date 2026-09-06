@@ -1,6 +1,6 @@
 <div align="center">
   <h1>sticker-cli</h1>
-  <p>给人和 AI Agent 使用的本地表情包 CLI</p>
+  <p>面向 AI Agent 的本地表情包 CLI，让聊天更有趣</p>
   <p>
     <a href="https://github.com/9Ashwin/sticker-cli/actions/workflows/ci.yml"><img src="https://github.com/9Ashwin/sticker-cli/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
     <img src="https://img.shields.io/badge/Go-1.26.8-00ADD8?logo=go&logoColor=white" alt="Go 1.26.8">
@@ -8,11 +8,11 @@
   </p>
 </div>
 
-`sticker-cli` 把程序、表情包素材和个人收藏分开管理。它在本地完成选包、搜索、原图校验、预览和收藏整理，不要求微信账号、MCP 服务或常驻网络连接；任何能运行 CLI 的 Agent 都可以通过稳定的 JSON 合同使用它。
+`sticker-cli` 是一个面向 AI Agent 的本地表情包 CLI，让 Agent 能在聊天中按场景搜索、选择和展示表情包。它把程序、表情包素材和个人收藏分开管理，在本地完成选包、搜索、原图校验、预览和收藏整理，不要求微信账号、MCP 服务或常驻网络连接；人也可以直接运行同一套命令。
 
 默认策略是安装 CLI 时不下载原图；首次执行 `sticker setup` 会安装 `curated` 精选表情包。只有显式传入 `--pack all` 才下载全量素材。安装器始终安装 `sticker` Skill，避免出现“命令已安装但 Agent 不会触发”的半成品状态。
 
-## 你可以用它做什么
+## Agent 可以用它做什么
 
 - 按需安装精选表情包或全量表情包；`setup` 默认精选，避免一次下载完整素材集。
 - 用宽泛的场景词搜索，返回多个候选；描述用于帮助选择，不把一个词绑定到唯一情绪。
