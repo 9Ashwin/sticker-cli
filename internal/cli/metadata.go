@@ -166,13 +166,29 @@ func packRemoveMetadata() commandMetadata {
 		Path:        "packs remove",
 		Use:         "remove ID",
 		Summary:     "Remove one installed pack relationship",
-		Description: "Remove the selected pack state without deleting original image files; report retained bytes.",
+		Description: "Remove the selected pack state without deleting original image files; a corrupt state can also be cleared for reinstall.",
 		Effect:      effectWrite,
 		Parameters:  []parameterMetadata{{Name: "id", Type: "string", Source: "argument", Description: "Installed pack ID", Required: true}},
 		Flags:       []flagMetadata{{Name: "dry-run", Type: "bool", Default: false, Description: "Show the plan without writing"}},
-		Result:      objectSchema("removed", "bool", "retained_bytes", "int", "committed", "bool", "dry_run", "bool"),
+		Result:      objectSchema("removed", "bool", "retained_bytes", "int", "state_corrupt", "bool", "committed", "bool", "dry_run", "bool"),
 		Errors:      defaultErrors(),
 		Examples:    []string{"sticker packs remove curated", "sticker packs remove curated --dry-run"},
+		Args:        cobra.ExactArgs(1),
+	}
+}
+
+func packRepairMetadata() commandMetadata {
+	return commandMetadata{
+		Path:        "packs repair",
+		Use:         "repair ID",
+		Summary:     "Clear one corrupt installed pack state",
+		Description: "Clear only an invalid installed pack state so the pack can be reinstalled; original image files and personal favorites are retained.",
+		Effect:      effectWrite,
+		Parameters:  []parameterMetadata{{Name: "id", Type: "string", Source: "argument", Description: "Pack ID with a corrupt installed state", Required: true}},
+		Flags:       []flagMetadata{{Name: "dry-run", Type: "bool", Default: false, Description: "Show the plan without writing"}},
+		Result:      objectSchema("repaired", "bool", "retained_bytes", "int", "committed", "bool", "dry_run", "bool"),
+		Errors:      defaultErrors(),
+		Examples:    []string{"sticker packs repair all", "sticker packs repair all --dry-run"},
 		Args:        cobra.ExactArgs(1),
 	}
 }

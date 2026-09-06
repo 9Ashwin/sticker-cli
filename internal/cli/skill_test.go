@@ -27,6 +27,7 @@ func TestAgentSkillDocumentsDiscoverableCommands(t *testing.T) {
 		"sticker setup --pack curated",
 		"sticker setup --pack all",
 		"sticker packs install curated",
+		"sticker packs repair",
 		"sticker search",
 		"sticker get <id> --preview",
 		"sticker favorites add --id <id>",
@@ -49,6 +50,7 @@ func TestAgentSkillDocumentsDiscoverableCommands(t *testing.T) {
 	for _, command := range []string{
 		"setup",
 		"packs install",
+		"packs repair",
 		"get",
 		"favorites add",
 		"favorites import",

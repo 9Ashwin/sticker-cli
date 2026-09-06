@@ -6,6 +6,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/9Ashwin/sticker-cli/internal/library"
@@ -136,5 +137,58 @@ func TestRemoveRequiresValidPackID(t *testing.T) {
 	for _, id := range []string{"", "../escape", "A"} {
 		_, err := Remove(context.Background(), RemoveOptions{Home: t.TempDir(), PackID: id})
 		assertPackError(t, err, "validation", "invalid_argument")
+	}
+}
+
+func TestRemoveClearsCorruptStateAndRetainsOriginal(t *testing.T) {
+	fixture := newInstallFixture(t)
+	home := filepath.Join(t.TempDir(), "library")
+	if _, err := Install(context.Background(), InstallOptions{Home: home, Source: fixture.root, PackID: "curated"}); err != nil {
+		t.Fatal(err)
+	}
+
+	statePath := filepath.Join(home, ".sticker", "packs", "curated.json")
+	stateBytes, err := os.ReadFile(statePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var state installedState
+	if err := json.Unmarshal(stateBytes, &state); err != nil {
+		t.Fatal(err)
+	}
+	state.Revision = strings.Repeat("0", 64)
+	corruptBytes, err := json.Marshal(state)
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeFixtureFile(t, statePath, corruptBytes)
+
+	planned, err := Remove(context.Background(), RemoveOptions{Home: home, PackID: "curated", DryRun: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !planned.Removed || !planned.StateCorrupt || planned.RetainedBytes != 0 || planned.Committed || !planned.DryRun {
+		t.Fatalf("unexpected corrupt-state dry-run: %+v", planned)
+	}
+	if _, err := os.Stat(statePath); err != nil {
+		t.Fatalf("dry-run removed corrupt state: %v", err)
+	}
+
+	result, err := Remove(context.Background(), RemoveOptions{Home: home, PackID: "curated"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !result.Removed || !result.StateCorrupt || result.RetainedBytes != 0 || !result.Committed || result.DryRun {
+		t.Fatalf("unexpected corrupt-state removal: %+v", result)
+	}
+	if _, err := os.Stat(statePath); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("corrupt state remains after removal: %v", err)
+	}
+	root, err := library.New(home)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := root.VerifyItem(context.Background(), fixture.item); err != nil {
+		t.Fatalf("remove damaged the original: %v", err)
 	}
 }

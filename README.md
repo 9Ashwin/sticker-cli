@@ -163,9 +163,16 @@ sticker setup --pack all --source /path/to/sticker-ext
 sticker packs install curated --source /path/to/sticker-ext
 sticker packs update curated
 sticker packs remove curated --dry-run
+sticker packs repair curated --dry-run
 ```
 
 只想查看将要发生的变化时，加上 `--dry-run`；它不会写入本地素材库。
+
+如果旧版本或手工操作留下了损坏的包状态，`packs update` 或重新安装可能返回
+`integrity/invalid_collection`。先运行 `sticker packs repair <id>` 清理该包的损坏状态，
+再用原来的素材源执行 `sticker packs install <id> --source /path/to/sticker-ext`。
+修复只移除 `.sticker/packs/<id>.json`，不会删除原图或个人收藏；可先加
+`--dry-run` 查看计划。
 
 ### 3. 搜索并取得表情包
 
@@ -305,7 +312,7 @@ sticker --help
 
 主线已完成以下本地闭环：
 
-- `packs list/install/update/remove` 与 `setup` 的精选/全量选择、来源校验、缓存和 dry-run。
+- `packs list/install/update/remove/repair` 与 `setup` 的精选/全量选择、来源校验、缓存和 dry-run。
 - 离线 `search`、完整性校验后的 `get`、静态 WebP PNG 预览。
 - 收藏的添加、描述修改、取消、标准 v1 导入/导出。
 - 收藏分组的创建、重命名、删除、筛选、手动/时间/描述/MD5 排序和批量整理。

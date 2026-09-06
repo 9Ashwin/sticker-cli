@@ -165,7 +165,8 @@ Cobra 注册真实参数；schema 读取实际参数定义，并附带每条命�
 | favorites remove ID... | --dry-run | removed, retained_original, committed | P2 |
 | favorites export DIR | --dry-run | path, count, size | P2 |
 | packs update ID | --dry-run；沿用已保存 source | 与 install 相同 | P2 |
-| packs remove ID | --dry-run | removed, retained_bytes | P2 |
+| packs remove ID | --dry-run | removed, retained_bytes, state_corrupt（损坏状态时） | P2 |
+| packs repair ID | --dry-run | repaired, retained_bytes, committed | P2 |
 
 item：`id`（等于 md5）、`md5`、`sha256`、`filename`、`format`、`size`、`caption`、`path`（绝对）、`favorite`、`packs`（排序后的包 ID 数组）。`get --preview` 在静态 WebP 时额外返回绝对 `preview_path`（PNG）；预览使用 SHA-256 作为缓存身份，原图 `path` 与内容标识不变。没有自定义 Markdown 拼接，也不自动打开外部应用。
 
