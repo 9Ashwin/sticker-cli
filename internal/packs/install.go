@@ -580,6 +580,9 @@ func publishInstall(ctx context.Context, prepared preparedInstall, staged map[st
 }
 
 func encodeInstalledState(state installedState) ([]byte, error) {
+	if len(state.ManifestRaw) == 0 {
+		state.ManifestRaw = append([]byte(nil), state.Manifest...)
+	}
 	data, err := json.Marshal(state)
 	if err != nil {
 		return nil, wrapError("internal", "unexpected", "cannot encode installed pack state", "Retry the operation.", err)
@@ -839,17 +842,22 @@ func readInstalledState(home, id string) (installedState, bool, error) {
 	if err := decodeStrict(data, &state); err != nil {
 		return installedState{}, false, invalidInstalledState(id, err.Error())
 	}
-	if state.SchemaVersion != 1 || state.ID != id || state.Source == "" || !isLowerHex(state.Revision, sha256.Size) || len(state.Manifest) == 0 {
+	manifestBytes := state.Manifest
+	if len(state.ManifestRaw) > 0 {
+		manifestBytes = state.ManifestRaw
+	}
+	if state.SchemaVersion != 1 || state.ID != id || state.Source == "" || !isLowerHex(state.Revision, sha256.Size) || len(manifestBytes) == 0 {
 		return installedState{}, false, invalidInstalledState(id, "metadata is invalid")
 	}
-	sum := sha256.Sum256(state.Manifest)
+	sum := sha256.Sum256(manifestBytes)
 	if hex.EncodeToString(sum[:]) != state.Revision {
 		return installedState{}, false, invalidInstalledState(id, "manifest revision does not match its raw bytes")
 	}
-	if _, err := decodeManifest(state.Manifest); err != nil {
+	if _, err := decodeManifest(manifestBytes); err != nil {
 		return installedState{}, false, invalidInstalledState(id, err.Error())
 	}
-	state.Manifest = append([]byte(nil), state.Manifest...)
+	state.Manifest = append([]byte(nil), manifestBytes...)
+	state.ManifestRaw = nil
 	return state, true, nil
 }
 
