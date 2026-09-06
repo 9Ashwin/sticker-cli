@@ -27,7 +27,44 @@ CLI 与公共素材仓库是两个独立项目：
 
 ### 1. 安装 CLI
 
-当前主线可以从源码构建。准备 Go 1.26.8 或更新版本：
+#### 推荐：一键安装 CLI 和 Agent Skill
+
+Linux 和 macOS：
+
+```bash
+curl --proto '=https' --tlsv1.2 -fsSL \
+  https://raw.githubusercontent.com/9Ashwin/sticker-cli/main/scripts/install.sh | bash
+```
+
+Windows PowerShell：
+
+```powershell
+irm https://raw.githubusercontent.com/9Ashwin/sticker-cli/main/scripts/install.ps1 | iex
+```
+
+一键入口会校验并安装当前稳定版 CLI，同时把 `sticker` Skill 安装到支持的 Agent
+客户端；它不会下载任何表情原图。已有 Skill 会保留，纯二进制安装可以显式跳过：
+
+```bash
+curl --proto '=https' --tlsv1.2 -fsSL \
+  https://raw.githubusercontent.com/9Ashwin/sticker-cli/main/scripts/install.sh | bash -s -- --no-skill
+```
+
+#### Agent 快速开始
+
+安装完成后，Agent 只需要初始化一个素材包即可开始工作：
+
+```bash
+sticker setup --pack curated
+sticker search "回应" --limit 8
+```
+
+之后可以直接说“发个表情包给我”或“找个调皮的表情”，Skill 会把请求路由到
+`search → get → 展示`；全量素材仍需显式执行 `sticker setup --pack all`。
+
+#### 从源码安装
+
+准备 Go 1.26.8 或更新版本：
 
 ```bash
 git clone https://github.com/9Ashwin/sticker-cli.git
@@ -48,6 +85,23 @@ sticker version
 ```bash
 go install github.com/9Ashwin/sticker-cli/cmd/sticker@main
 ```
+
+源码构建和 `go install` 只安装二进制。要给 Agent 加上 Skill，可以使用通用的
+Skill 管理器：
+
+```bash
+npx --yes skills add https://github.com/9Ashwin/sticker-cli/tree/main \
+  --skill sticker --global --yes --copy
+```
+
+也可以把仓库中的 Skill 复制到指定客户端目录：
+
+```bash
+./scripts/install-skill.sh /path/to/agent/skills/sticker
+```
+
+`scripts/install.sh` 和 `scripts/install.ps1` 支持 `--skill-dir`/`-SkillDir` 或
+`STICKER_SKILL_DIR` 指定直接安装位置；安装器不会覆盖已有的 `sticker` Skill。
 
 版本 tag 触发发布工作流后，会为 Linux amd64/arm64、macOS amd64/arm64 和 Windows amd64 生成带 SHA-256 校验的归档；归档只含程序、版本/校验文件和许可证，不包含原图。
 
@@ -172,6 +226,8 @@ sticker --help
 ```bash
 ./scripts/install-skill.sh /path/to/agent/skills/sticker
 ```
+
+安装 Skill 后，用户可以直接说“发个表情包给我”“来个调皮的表情”或“把这张加入收藏”；Agent 会按 `search → get → 展示/收藏` 路由调用 CLI，不需要用户记住子命令。
 
 一个典型的 Agent 流程是：安装精选包 → 用场景词搜索多个候选 → 对选中的 ID 调用 `get` → 展示返回的本地路径 → 用 `favorites add` 或标准 v1 目录导入 → 创建分组并用 `organize --dry-run` 预览整理。
 

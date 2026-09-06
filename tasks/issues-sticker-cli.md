@@ -313,7 +313,7 @@ GitHub：[9Ashwin/sticker-cli#15](https://github.com/9Ashwin/sticker-cli/issues/
 - [ ] 提供 go install 与各平台 PATH 文档，安装程序本身零素材下载。
 - [ ] 固定代码许可证后发布，原图不打进 CLI Release。
 - [ ] 测试单二进制无 Go/Node/Python/MCP 运行依赖；原生 smoke 与交叉编译分开记录。
-- [ ] 发布版本固定的跨平台归档、`checksums.txt`、Unix shell 和 Windows PowerShell 安装入口；默认写入用户目录、无需 sudo，校验失败拒绝安装且不把原图打进归档。
+- [ ] 发布版本固定的跨平台归档、`checksums.txt`、Unix shell 和 Windows PowerShell 安装入口；默认写入用户目录、无需 sudo，一键入口默认安装 CLI 与 Skill，校验失败拒绝安装且不把原图打进归档。
 
 相关实现运行聚焦回归、Go test/vet/lint；并发和文件提交增加 race 与目标平台验证。素材任务运行清单/原图校验及文档链接检查。
 

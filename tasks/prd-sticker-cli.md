@@ -66,7 +66,7 @@ CLI 首次使用默认官方素材源，同时支持显式指定本地包目录�
 - [ ] 发布 macOS arm64/amd64、Linux arm64/amd64、Windows amd64 原生二进制与 SHA-256 校验文件。
 - [ ] 二进制运行不依赖 Go、Node.js、Python、CGO、MCP 服务或微信登录。
 - [ ] 提供 `go install` 源码安装方式；`version` 显示版本。
-- [ ] CLI 安装过程不下载表情原图，不修改全局 Agent 指引。
+- [ ] CLI 安装过程不下载表情原图；一键 Agent 安装入口可同时安装 Skill，纯二进制安装不会修改全局 Agent 指引。
 - [ ] 各平台提供安装与 PATH 说明，完成原生 smoke test；交叉编译单独报告。
 - [ ] 发布归档包含对应平台二进制、`checksums.txt` 和版本信息；安装入口默认写入用户目录、不要求 sudo，校验失败拒绝安装，Windows 提供 PowerShell 入口。
 

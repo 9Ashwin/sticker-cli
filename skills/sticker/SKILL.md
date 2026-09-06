@@ -1,6 +1,11 @@
 ---
 name: sticker
-description: Use the sticker CLI to find, preview, display, save, import, and organize local reaction images.
+version: 1.0.0
+description: "本地贴纸/表情包：当用户说“发个表情包”“来个表情”“找张图”“换个贴纸”，或要求搜索、预览、展示、收藏、导入、分类、排序表情时，使用 sticker CLI。"
+metadata:
+  requires:
+    bins: ["sticker"]
+  cliHelp: "sticker --help"
 ---
 
 # Sticker CLI
@@ -10,9 +15,50 @@ default in an envelope with `ok` and `data`; read paths and IDs from the
 returned JSON instead of constructing them. Use `sticker --help` for a human
 summary and `sticker schema [command...]` for the machine-readable contract.
 
+## 意图路由
+
+把下列口语请求直接路由到 CLI，用户不需要记住命令名：
+
+| 用户意图 | CLI 流程 |
+| --- | --- |
+| “发个表情包给我”“来个表情”“换个表情” | 使用宽泛场景词执行 `search` → `get` → 展示返回的本地路径 |
+| “找一个调皮/开心/上班的表情” | 执行 `search "<scene>" --limit 8`，检查多个候选后对选中 ID 调用 `get` |
+| “看看这个表情”“预览一下” | 对 ID 调用 `get`；仅静态 WebP 加 `--preview` |
+| “把这张加入收藏”“保存这个” | 用返回的 ID 或本地路径执行 `favorites add` |
+| “导入这个表情包/素材库” | 执行 `favorites import <v1-directory>` |
+| “把收藏分类/整理/排序” | 使用 `favorites collections`、`favorites list` 或 `favorites organize` |
+
+用户没有指定场景时，使用 `调皮`、`回应` 等宽泛词，选择一个通用、轻松的
+候选，不要追问精确语义。检查多个结果后选一个，把经过校验的绝对路径
+`data.item.path` 渲染到当前 Agent 回复中。GIF 和动图必须使用原图路径；静态
+WebP 才可以使用生成的预览路径。
+
+“发给我”默认表示在当前 Agent 对话中展示。CLI 只返回本地路径，不向微信、飞书
+或其他外部聊天发送。
+
+### 首次使用
+
+如果 `sticker search` 报告没有已安装素材包，先运行 `sticker packs list`，除非
+用户明确要求全量，否则只安装精选包：
+
+```bash
+sticker setup --pack curated
+```
+
+用户提供本地 `sticker-ext` checkout 时，用 `--source /path/to/sticker-ext` 指定
+来源。安装完成后重试原始搜索；之后搜索和展示都可以离线完成。
+
 ## Install the skill safely
 
 This directory can be copied into any Agent client that loads `SKILL.md` files.
+For a release installation that includes both the CLI and this Skill, use the
+platform installer; it does not download sticker images:
+
+```bash
+curl --proto '=https' --tlsv1.2 -fsSL \
+  https://raw.githubusercontent.com/9Ashwin/sticker-cli/main/scripts/install.sh | bash
+```
+
 Use the repository helper with the client's skill directory as its argument:
 
 ```bash
