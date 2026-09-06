@@ -2,7 +2,8 @@
 param(
     [string]$Version = '',
     [string]$InstallDir = '',
-    [switch]$NoSkill,
+    [string]$Pack = '',
+    [string]$Source = '',
     [string]$SkillDir = ''
 )
 
@@ -29,8 +30,26 @@ if (-not $skillDirExplicit) {
         $skillDirExplicit = $true
     }
 }
+if (-not [string]::IsNullOrWhiteSpace($Source) -and [string]::IsNullOrWhiteSpace($Pack)) {
+    Fail '-Source requires -Pack curated or -Pack all'
+}
+if (-not [string]::IsNullOrWhiteSpace($Pack) -and $Pack -notin @('curated', 'all')) {
+    Fail '-Pack must be curated or all'
+}
 if ([string]::IsNullOrWhiteSpace($Version)) {
-    $Version = (Invoke-RestMethod -Uri "https://api.github.com/repos/$repo/releases/latest").tag_name
+    if (-not [string]::IsNullOrWhiteSpace($env:STICKER_VERSION)) {
+        $Version = $env:STICKER_VERSION
+    } else {
+        try {
+            $Version = (Invoke-RestMethod -Uri "https://api.github.com/repos/$repo/releases/latest").tag_name
+        } catch {
+            Fail "could not read a published release; pass -Version vX.Y.Z or use 'go install github.com/$repo/cmd/sticker@latest'"
+        }
+    }
+}
+$Version = [string]$Version
+if ([string]::IsNullOrWhiteSpace($Version)) {
+    Fail "no GitHub release is published yet; install with 'go install github.com/$repo/cmd/sticker@latest' or pass -Version vX.Y.Z"
 }
 $Version = "v$($Version.TrimStart('v'))"
 if ($Version -notmatch '^v[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$') {
@@ -96,55 +115,53 @@ try {
         Write-Output "add $InstallDir to PATH to run sticker directly"
     }
 
-    if (-not $NoSkill) {
-        $installedBySkillsManager = $false
-        $existingSkill = Test-Path -LiteralPath (Join-Path $SkillDir 'SKILL.md')
-        if (-not $existingSkill -and -not $skillDirExplicit -and (Get-Command npx -ErrorAction SilentlyContinue)) {
-            try {
-                $installedSkills = (& npx --yes skills ls --global --json 2>$null | Out-String)
-                $existingSkill = $installedSkills -match '"name"\s*:\s*"sticker"'
-            } catch {
-                $existingSkill = $false
-            }
+    $installedBySkillsManager = $false
+    $existingSkill = Test-Path -LiteralPath (Join-Path $SkillDir 'SKILL.md')
+    if (-not $existingSkill -and -not $skillDirExplicit -and (Get-Command npx -ErrorAction SilentlyContinue)) {
+        try {
+            $installedSkills = (& npx --yes skills ls --global --json 2>$null | Out-String)
+            $existingSkill = $installedSkills -match '"name"\s*:\s*"sticker"'
+        } catch {
+            $existingSkill = $false
         }
-        if (-not $existingSkill -and -not $skillDirExplicit -and (Get-Command npx -ErrorAction SilentlyContinue)) {
-            try {
-                & npx --yes skills add "https://github.com/$repo/tree/$Version" --skill sticker --global --yes --copy
-                if ($LASTEXITCODE -eq 0) {
-                    Write-Output 'installed sticker skill for supported Agent clients'
-                    $installedBySkillsManager = $true
-                }
-            } catch {
-                $installedBySkillsManager = $false
+    }
+    if (-not $existingSkill -and -not $skillDirExplicit -and (Get-Command npx -ErrorAction SilentlyContinue)) {
+        try {
+            & npx --yes skills add "https://github.com/$repo/tree/$Version" --skill sticker --global --yes --copy
+            if ($LASTEXITCODE -eq 0) {
+                Write-Output 'installed sticker skill for supported Agent clients'
+                $installedBySkillsManager = $true
             }
+        } catch {
+            $installedBySkillsManager = $false
         }
+    }
 
-        if (-not $installedBySkillsManager) {
-            if (Test-Path -LiteralPath $SkillDir) {
-                if (Test-Path -LiteralPath (Join-Path $SkillDir 'SKILL.md')) {
-                    Write-Output "sticker skill already exists at $SkillDir; skipped"
-                } else {
-                    Fail "skill destination exists and is not a sticker skill: $SkillDir"
-                }
+    if (-not $installedBySkillsManager) {
+        if (Test-Path -LiteralPath $SkillDir) {
+            if (Test-Path -LiteralPath (Join-Path $SkillDir 'SKILL.md')) {
+                Write-Output "sticker skill already exists at $SkillDir; skipped"
             } else {
-                $skillParent = Split-Path -Parent $SkillDir
-                New-Item -ItemType Directory -Path $skillParent -Force | Out-Null
-                $skillTemporary = Join-Path $skillParent ('.sticker-skill-' + [Guid]::NewGuid().ToString('N'))
-                New-Item -ItemType Directory -Path $skillTemporary | Out-Null
-                try {
-                    $skillPath = Join-Path $skillTemporary 'SKILL.md'
-                    Invoke-WebRequest -UseBasicParsing -Uri "https://raw.githubusercontent.com/$repo/$Version/skills/sticker/SKILL.md" -OutFile $skillPath
-                    $skillContent = Get-Content -LiteralPath $skillPath -Raw
-                    if ($skillContent -notmatch '(?m)^name:\s*sticker\s*$') {
-                        Fail 'downloaded sticker Skill is invalid'
-                    }
-                    Move-Item -LiteralPath $skillTemporary -Destination $SkillDir
-                    $skillTemporary = $null
-                    Write-Output "installed sticker skill at $SkillDir"
-                } finally {
-                    if ($null -ne $skillTemporary) {
-                        Remove-Item -LiteralPath $skillTemporary -Recurse -Force -ErrorAction SilentlyContinue
-                    }
+                Fail "skill destination exists and is not a sticker skill: $SkillDir"
+            }
+        } else {
+            $skillParent = Split-Path -Parent $SkillDir
+            New-Item -ItemType Directory -Path $skillParent -Force | Out-Null
+            $skillTemporary = Join-Path $skillParent ('.sticker-skill-' + [Guid]::NewGuid().ToString('N'))
+            New-Item -ItemType Directory -Path $skillTemporary | Out-Null
+            try {
+                $skillPath = Join-Path $skillTemporary 'SKILL.md'
+                Invoke-WebRequest -UseBasicParsing -Uri "https://raw.githubusercontent.com/$repo/$Version/skills/sticker/SKILL.md" -OutFile $skillPath
+                $skillContent = Get-Content -LiteralPath $skillPath -Raw
+                if ($skillContent -notmatch '(?m)^name:\s*sticker\s*$') {
+                    Fail 'downloaded sticker Skill is invalid'
+                }
+                Move-Item -LiteralPath $skillTemporary -Destination $SkillDir
+                $skillTemporary = $null
+                Write-Output "installed sticker skill at $SkillDir"
+            } finally {
+                if ($null -ne $skillTemporary) {
+                    Remove-Item -LiteralPath $skillTemporary -Recurse -Force -ErrorAction SilentlyContinue
                 }
             }
         }
@@ -154,4 +171,17 @@ try {
         Remove-Item -LiteralPath $temporary -Force -ErrorAction SilentlyContinue
     }
     Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
+}
+
+if (-not [string]::IsNullOrWhiteSpace($Pack)) {
+    $setupArgs = @('setup', '--pack', $Pack)
+    if (-not [string]::IsNullOrWhiteSpace($Source)) {
+        $setupArgs += @('--source', $Source)
+    } elseif (-not [string]::IsNullOrWhiteSpace($env:STICKER_PACK_SOURCE)) {
+        $setupArgs += @('--source', $env:STICKER_PACK_SOURCE)
+    }
+    & (Join-Path $InstallDir 'sticker.exe') @setupArgs
+    if ($LASTEXITCODE -ne 0) {
+        Fail "CLI installed, but $Pack pack setup failed; rerun sticker setup --pack $Pack after fixing the source"
+    }
 }

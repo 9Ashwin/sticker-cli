@@ -55,7 +55,7 @@ Cobra 注册真实参数；schema 读取实际参数定义，并附带每条命�
 
 `manifest.json` 只收录用户添加、收藏或导入的条目；搜索集合是它与已安装包条目的并集。单独读取此标准清单即可使用个人素材，不要求理解 `.sticker/`。个人库始终不依赖公共包状态才能找到原图。
 
-`--home` > `STICKER_HOME` > `os.UserConfigDir()/sticker`。输出路径先转成绝对路径；纯读命令在空库不创建目录。手工编辑素材前应结束正在运行的 CLI 写操作。
+`--home` > `STICKER_HOME` > `os.UserConfigDir()/sticker`。输出路径先转成绝对路径；纯读命令在空库不创建目录。手工编辑素材前应结束正在运行的 CLI 写操作。素材源参数遵循 `--source` > `STICKER_PACK_SOURCE` > 官方 HTTPS 默认值，便于在无法访问公网时固定本地 checkout。
 
 ### 3.2 标准素材清单
 
@@ -153,7 +153,7 @@ Cobra 注册真实参数；schema 读取实际参数定义，并附带每条命�
 | schema [command…] | Cobra 命令路径 | command, parameters, result_schema, errors, effect, examples | P1 |
 | packs list | --source ROOT, --offline | items（含 installed/revision）, fetched_at, stale | P1 |
 | packs install ID | --source ROOT, --dry-run | pack, revision, added, reused, download_bytes | P1 |
-| search QUERY | --pack ID, --favorites, --limit N, --offset N | items, total, next_offset, has_more | P1 |
+| search QUERY | --pack ID, --favorites, --limit N, --offset N | items, total, next_offset, has_more, setup_required（空库首次使用） | P1 |
 | setup | --pack curated\|all（默认 curated）, --source ROOT, --dry-run | 与 install 相同并附 setup 标记 | P1 |
 | get ID | 完整小写 MD5；可选 `--preview` | item（含可选 preview_path） | P1 |
 | favorites add [PATH] | --id ID（二选一）, --caption TEXT, --dry-run | item, added, updated | P1 |
@@ -193,7 +193,7 @@ message/hint 为面向人的文字，不是分支依据；type/subtype/退出码
 
 重复项 caption 优先级：存在个人记录时使用个人 caption（包括显式空值）；否则按 pack ID 字典序选择首个非空 caption。查询结果按 MD5 升序。offset ≥ total 返回空列表；limit 1–100，默认 10；offset ≥ 0。
 
-翻页时修改素材会改变顺序，用户应重启检索；首版不承诺跨变更快照游标。get 校验文件，search 只读清单而不全量读图；路径是查询时的位置，后续外部删除会使其失效。
+翻页时修改素材会改变顺序，用户应重启检索；首版不承诺跨变更快照游标。get 校验文件，search 只读清单而不全量读图；路径是查询时的位置，后续外部删除会使其失效。个人清单和已安装包都为空时，search 仍返回成功的空列表，并在 data 中设置 `setup_required:true`，让 Agent 能区分首次初始化和普通无匹配结果。
 
 ### 4.4 WebP 预览
 
@@ -203,7 +203,7 @@ message/hint 为面向人的文字，不是分支依据；type/subtype/退出码
 
 `setup` 是对正式安装流程的 convenience 包装，不引入第二套状态或下载逻辑。未传 `--pack` 时使用 `curated`；只有显式传入 `--pack all` 才安装全量。它透传 `--source` 和 `--dry-run`，返回与 `packs install` 相同的修订、计数和字节字段，并额外标记 `setup:true`。命令帮助必须指向正式的 `packs install`，不能让 Agent 依赖隐式默认全量。
 
-Release 为每个支持的平台提供版本固定的归档、`checksums.txt`，以及 Unix shell 和 Windows PowerShell 安装入口。入口识别 OS/架构，默认写入用户可写目录，不要求 sudo；下载后先校验 SHA-256，校验失败删除临时文件并以非零退出。一键入口默认同时安装 CLI 和 Agent Skill，`--no-skill`/等价参数可保留纯二进制模式；二进制安装与素材安装分开，脚本不把图片打入归档，也不绕过 `packs install` 的包修订、dry-run 和本地源合同。安装入口支持显式版本，未指定版本使用发布页声明的稳定版本。
+Release 为每个支持的平台提供版本固定的归档、`checksums.txt`，以及 Unix shell 和 Windows PowerShell 安装入口。入口识别 OS/架构，默认写入用户可写目录，不要求 sudo；下载后先校验 SHA-256，校验失败删除临时文件并以非零退出。一键入口始终同时安装或保留 CLI 和 Agent Skill；传入 `--pack curated|all`（PowerShell 使用 `-Pack`）时可在同一调用中初始化素材，`--source`/`-Source` 可固定本地或 HTTPS 来源。二进制安装与素材安装分开，脚本不把图片打入归档，也不绕过 `packs install` 的包修订、dry-run 和本地源合同。安装入口支持显式版本，未指定版本使用发布页声明的稳定版本；尚未有 Release 时应给出源码安装指引。
 
 ## 5. 用例与一致性
 

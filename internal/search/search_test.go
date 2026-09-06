@@ -148,6 +148,28 @@ func TestExecutePaginationAndEmptyResults(t *testing.T) {
 	}
 }
 
+func TestExecuteMarksEmptyLibraryForSetup(t *testing.T) {
+	result, err := Execute(context.Background(), Options{Home: t.TempDir(), Query: "调皮", Limit: 10})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Total != 0 || len(result.Items) != 0 || !result.SetupRequired {
+		t.Fatalf("empty library should request setup: %+v", result)
+	}
+}
+
+func TestExecuteDoesNotRequestSetupWhenFavoritesExist(t *testing.T) {
+	root := t.TempDir()
+	writePersonalManifest(t, root, []library.Item{fixtureItem("personal", "调皮回应")})
+	result, err := Execute(context.Background(), Options{Home: root, Query: "调皮", Limit: 10})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Total != 1 || result.SetupRequired {
+		t.Fatalf("personal library should be ready without a pack: %+v", result)
+	}
+}
+
 func TestExecuteRejectsDigestConflictAndUnknownPack(t *testing.T) {
 	root := t.TempDir()
 	first := fixtureItem("conflict", "first")

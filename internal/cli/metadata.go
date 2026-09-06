@@ -117,7 +117,7 @@ func packListMetadata() commandMetadata {
 		Description: "Read pack metadata without downloading original image files. Use --offline to require a cached catalog.",
 		Effect:      effectRead,
 		Flags: []flagMetadata{
-			{Name: "source", Type: "string", Description: "Pack directory or HTTPS source"},
+			{Name: "source", Type: "string", Description: "Pack directory or HTTPS source (overrides STICKER_PACK_SOURCE)"},
 			{Name: "offline", Type: "bool", Default: false, Description: "Use only cached catalog data"},
 		},
 		Result:   objectSchema("items", "object[]", "fetched_at", "string", "stale", "bool"),
@@ -135,7 +135,7 @@ func packInstallMetadata() commandMetadata {
 		Effect:      effectWrite,
 		Parameters:  []parameterMetadata{{Name: "id", Type: "string", Source: "argument", Description: "Pack ID", Required: true}},
 		Flags: []flagMetadata{
-			{Name: "source", Type: "string", Description: "Pack directory or HTTPS source"},
+			{Name: "source", Type: "string", Description: "Pack directory or HTTPS source (overrides STICKER_PACK_SOURCE)"},
 			{Name: "dry-run", Type: "bool", Default: false, Description: "Show the plan without downloading or writing"},
 		},
 		Result:   objectSchema("source", "string", "target", "string", "pack", "object", "revision", "string", "added", "int", "reused", "int", "download_bytes", "int", "dry_run", "bool"),
@@ -191,7 +191,7 @@ func searchMetadata() commandMetadata {
 			{Name: "limit", Type: "int", Default: 10, Description: "Maximum results (1-100)"},
 			{Name: "offset", Type: "int", Default: 0, Description: "Number of matching results to skip"},
 		},
-		Result:   objectSchema("items", "object[]", "total", "int", "next_offset", "int", "has_more", "bool"),
+		Result:   objectSchema("items", "object[]", "total", "int", "next_offset", "int", "has_more", "bool", "setup_required", "bool"),
 		Errors:   defaultErrors(),
 		Examples: []string{"sticker search 收到 --limit 5", "sticker search coffee --favorites"},
 		Args:     cobra.ExactArgs(1),
@@ -223,7 +223,7 @@ func setupMetadata() commandMetadata {
 		Effect:      effectWrite,
 		Flags: []flagMetadata{
 			{Name: "pack", Type: "string", Default: "curated", Description: "Pack to install: curated (default) or all"},
-			{Name: "source", Type: "string", Description: "Pack directory or HTTPS source"},
+			{Name: "source", Type: "string", Description: "Pack directory or HTTPS source (overrides STICKER_PACK_SOURCE)"},
 			{Name: "dry-run", Type: "bool", Default: false, Description: "Show the plan without downloading or writing"},
 		},
 		Result:   objectSchema("setup", "bool", "source", "string", "target", "string", "pack", "object", "revision", "string", "added", "int", "reused", "int", "download_bytes", "int", "dry_run", "bool"),

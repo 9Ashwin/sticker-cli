@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"errors"
+	"os"
 
 	"github.com/9Ashwin/sticker-cli/internal/packs"
 	"github.com/spf13/cobra"
@@ -13,6 +14,7 @@ func runPackInstall(cmd *cobra.Command, options *rootOptions, args []string) err
 	if err != nil {
 		return err
 	}
+	source = resolvePackSource(source)
 	dryRun, err := cmd.Flags().GetBool("dry-run")
 	if err != nil {
 		return err
@@ -37,6 +39,7 @@ func runSetup(cmd *cobra.Command, options *rootOptions) error {
 	if err != nil {
 		return err
 	}
+	source = resolvePackSource(source)
 	dryRun, err := cmd.Flags().GetBool("dry-run")
 	if err != nil {
 		return err
@@ -160,6 +163,7 @@ func runPackList(cmd *cobra.Command, options *rootOptions) error {
 	if err != nil {
 		return err
 	}
+	source = resolvePackSource(source)
 	offline, err := cmd.Flags().GetBool("offline")
 	if err != nil {
 		return err
@@ -179,6 +183,13 @@ func runPackList(cmd *cobra.Command, options *rootOptions) error {
 		"stale":      result.Stale,
 	}
 	return writeResult(cmd, options, data, false)
+}
+
+func resolvePackSource(source string) string {
+	if source != "" {
+		return source
+	}
+	return os.Getenv("STICKER_PACK_SOURCE")
 }
 
 func normalizePackError(err error) error {

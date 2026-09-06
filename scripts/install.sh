@@ -5,8 +5,9 @@ repo="9Ashwin/sticker-cli"
 version="${STICKER_VERSION:-}"
 install_dir="${STICKER_INSTALL_DIR:-${XDG_BIN_HOME:-$HOME/.local/bin}}"
 skill_dir="${STICKER_SKILL_DIR:-$HOME/.agents/skills/sticker}"
+pack=""
+pack_source=""
 skill_dir_explicit=false
-install_skill=true
 
 fail() {
   printf 'sticker install: %s\n' "$*" >&2
@@ -17,15 +18,16 @@ fail() {
 
 usage() {
   cat <<'EOF'
-Usage: install.sh [VERSION] [--no-skill] [--skill-dir DIR]
+Usage: install.sh [VERSION] [--pack curated|all] [--source DIR_OR_URL] [--skill-dir DIR]
 
-Install the sticker CLI and, by default, its Agent Skill. The installer never
-downloads sticker images; choose a pack later with `sticker setup`.
+Install the sticker CLI and its Agent Skill. The installer never downloads
+sticker images unless --pack is provided; choose a pack later with `sticker setup`.
 
 Environment:
   STICKER_VERSION       release version, for example v1.0.0
   STICKER_INSTALL_DIR   binary destination (default: $HOME/.local/bin)
   STICKER_SKILL_DIR     direct Skill destination when set
+  STICKER_PACK_SOURCE   default pack directory or HTTPS source for setup
 EOF
 }
 
@@ -35,8 +37,18 @@ while [[ $# -gt 0 ]]; do
       usage
       exit 0
       ;;
-    --no-skill)
-      install_skill=false
+    --pack)
+      [[ $# -ge 2 ]] || fail "--pack requires curated or all"
+      case "$2" in
+        curated|all) pack=$2 ;;
+        *) fail "--pack must be curated or all" ;;
+      esac
+      shift
+      ;;
+    --source)
+      [[ $# -ge 2 ]] || fail "--source requires a directory or HTTPS URL"
+      pack_source=$2
+      shift
       ;;
     --skill-dir)
       [[ $# -ge 2 ]] || fail "--skill-dir requires a directory"
@@ -58,6 +70,7 @@ done
 if [[ -n "${STICKER_SKILL_DIR:-}" ]]; then
   skill_dir_explicit=true
 fi
+[[ -z "$pack_source" || -n "$pack" ]] || fail "--source requires --pack curated or --pack all"
 
 download() {
   local url=$1
@@ -95,9 +108,12 @@ esac
 if [[ -z "$version" ]]; then
   metadata=$(mktemp)
   trap 'rm -f "$metadata"' EXIT
-  download "https://api.github.com/repos/${repo}/releases/latest" "$metadata"
+  if ! download "https://api.github.com/repos/${repo}/releases/latest" "$metadata"; then
+    fail "could not read a published release; pass STICKER_VERSION=vX.Y.Z or use 'go install github.com/${repo}/cmd/sticker@latest'"
+  fi
   version=$(sed -n 's/^[[:space:]]*"tag_name":[[:space:]]*"\([^"]*\)".*/\1/p' "$metadata" | head -n 1)
 fi
+[[ -n "$version" ]] || fail "no GitHub release is published yet; install with 'go install github.com/${repo}/cmd/sticker@latest' or pass STICKER_VERSION=vX.Y.Z"
 version="v${version#v}"
 [[ "$version" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]] || fail "version must be a release version such as v1.2.3"
 
@@ -172,8 +188,6 @@ install_skill_file() {
 
 install_agent_skill() {
   local installed_skills
-  [[ "$install_skill" == true ]] || return 0
-
   if [[ "$skill_dir_explicit" == false ]] && [[ -e "$skill_dir" ]]; then
     install_skill_file "$skill_dir"
     return 0
@@ -196,3 +210,15 @@ install_agent_skill() {
 }
 
 install_agent_skill
+
+if [[ -n "$pack" ]]; then
+  setup_args=(setup --pack "$pack")
+  if [[ -n "$pack_source" ]]; then
+    setup_args+=(--source "$pack_source")
+  elif [[ -n "${STICKER_PACK_SOURCE:-}" ]]; then
+    setup_args+=(--source "$STICKER_PACK_SOURCE")
+  fi
+  if ! "$install_dir/sticker" "${setup_args[@]}"; then
+    fail "CLI installed, but ${pack} pack setup failed; rerun sticker setup --pack ${pack} after fixing the source"
+  fi
+fi

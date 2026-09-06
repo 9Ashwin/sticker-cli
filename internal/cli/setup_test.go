@@ -148,6 +148,35 @@ func TestSetupAllRequiresExplicitSelection(t *testing.T) {
 	}
 }
 
+func TestSetupUsesPackSourceEnvironment(t *testing.T) {
+	source := t.TempDir()
+	content := []byte("GIF89a setup env")
+	item := cliTestItem(content, "environment source")
+	writeCLIPackVersion(t, source, []library.Item{item}, [][]byte{content})
+	t.Setenv("STICKER_PACK_SOURCE", source)
+
+	home := filepath.Join(t.TempDir(), "home")
+	var out, errOut bytes.Buffer
+	if code := Run(context.Background(), []string{"--home", home, "setup"}, &out, &errOut, "dev", "test"); code != 0 {
+		t.Fatalf("setup with source environment exit %d: %s", code, errOut.String())
+	}
+	var envelope struct {
+		OK   bool `json:"ok"`
+		Data struct {
+			Source string `json:"source"`
+			Pack   struct {
+				ID string `json:"id"`
+			} `json:"pack"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(out.Bytes(), &envelope); err != nil {
+		t.Fatal(err)
+	}
+	if !envelope.OK || envelope.Data.Source != source || envelope.Data.Pack.ID != "curated" {
+		t.Fatalf("unexpected setup environment response: %s", out.String())
+	}
+}
+
 type setupPackDescriptor struct {
 	ID             string `json:"id"`
 	Name           string `json:"name"`
