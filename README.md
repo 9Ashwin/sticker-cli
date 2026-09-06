@@ -51,6 +51,13 @@ $installer = irm https://raw.githubusercontent.com/9Ashwin/sticker-cli/main/scri
 & ([scriptblock]::Create($installer)) -Pack curated
 ```
 
+Windows 使用本地素材源时，把 `-Source` 传给同一个入口：
+
+```powershell
+$installer = irm https://raw.githubusercontent.com/9Ashwin/sticker-cli/main/scripts/install.ps1
+& ([scriptblock]::Create($installer)) -Pack curated -Source C:\path\to\sticker-ext
+```
+
 一键入口会校验并安装当前稳定版 CLI，同时把 `sticker` Skill 安装到支持的 Agent
 客户端；默认不会下载表情原图。已有 Skill 会保留。想在同一条命令中完成精选包初始化时，显式传入 `--pack curated`：
 

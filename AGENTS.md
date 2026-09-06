@@ -8,6 +8,8 @@
 
 主要开发和人工验收平台是 Linux 与 macOS。Windows 保留交叉构建、CI 和发布产物；没有 Windows 原生环境时，不要把交叉编译结果描述成已经完成原子替换或路径边界验收。
 
+安装器默认安装 CLI 和 Agent Skill，不提供跳过 Skill 的模式；默认不下载原图。发布安装器支持 Linux/macOS 的 `install.sh` 和 Windows PowerShell 的 `install.ps1`，传入 `--pack curated|all`（PowerShell 使用 `-Pack`）时，才在同一次调用中通过 CLI 初始化素材。素材源使用 `--source`/`-Source`，未传参数时可使用 `STICKER_PACK_SOURCE`；参数优先级为显式参数 > 环境变量 > 官方 HTTPS 源。
+
 ## 技术栈和目录职责
 
 - Go 1.26.8、Cobra 1.10.2、golangci-lint 2.13.2；构建必须支持 `CGO_ENABLED=0`。
@@ -50,6 +52,7 @@
 - 失败写 stderr、stdout 为空，稳定返回 `type`、`subtype` 和退出码；不要让 message 文案成为 Agent 分支依据。
 - 命令默认非交互，不隐式等待 stdin。需要机器发现时使用 `sticker schema [command...]`，帮助和 schema 必须与真实参数保持一致。
 - `setup` 默认只安装 `curated`；只有显式 `--pack all` 才选择全量。正式 `packs install`、`setup` 和本地素材源必须共享修订、校验、锁和原子提交语义。
+- 全新数据目录的 `search` 仍返回成功的空列表，但应在 `data.setup_required:true` 标记尚未安装素材包；普通无匹配结果不能带这个标记。Skill 和 Agent 应据此执行 `sticker setup --pack curated` 后重试原始查询。
 - 搜索按 caption 的宽泛、不区分英文大小写的子串匹配返回候选，不承诺唯一情绪或唯一语义命中；分页和排序键必须稳定。
 - `get` 返回经过完整性校验的绝对原图路径；`--preview` 只为静态 WebP 生成或复用 PNG，不嵌入图片字节。
 - `favorites add` 接受一个本地路径或一个已安装 ID；`favorites import` 读取标准 v1 目录；导入失败不能发布部分清单。
@@ -93,7 +96,7 @@ make e2e-agent
 - 下载保持 HTTPS、证书验证、有限重定向、大小/超时/重试预算和 SHA-256 校验；不猜测 CDN 主机，不转发用户凭据。
 - 写入使用受根目录约束的文件操作，并在提交前重新验证路径和文件内容，防止 TOCTOU、覆盖竞争和部分提交。
 - 输出只返回元数据和绝对路径，不输出原图字节、密钥或敏感 URL；默认不发送遥测。
-- 发布安装器先校验归档和二进制 checksum，失败时不替换目标程序；安装 CLI 与安装素材始终分开。
+- 发布安装器先校验归档和二进制 checksum，失败时不替换目标程序；归档不包含原图。安装器始终安装或保留 Skill，只有显式 `--pack` 才调用 CLI 初始化素材，并透传 `--source` 或 `STICKER_PACK_SOURCE`。
 
 ## 文档与交付
 
