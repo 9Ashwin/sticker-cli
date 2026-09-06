@@ -1,6 +1,6 @@
 <div align="center">
   <h1>sticker-cli</h1>
-  <p>给人和 AI Agent 使用的本地 sticker CLI</p>
+  <p>给人和 AI Agent 使用的本地表情包 CLI</p>
   <p>
     <a href="https://github.com/9Ashwin/sticker-cli/actions/workflows/ci.yml"><img src="https://github.com/9Ashwin/sticker-cli/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
     <img src="https://img.shields.io/badge/Go-1.26.8-00ADD8?logo=go&logoColor=white" alt="Go 1.26.8">
@@ -8,17 +8,19 @@
   </p>
 </div>
 
-`sticker-cli` 把程序、公共素材和个人收藏分开管理。它在本地完成选包、搜索、原图校验、预览和收藏整理，不要求微信账号、MCP 服务或常驻网络连接；任何能运行 CLI 的 Agent 都可以通过稳定的 JSON 合同使用它。
+`sticker-cli` 把程序、表情包素材和个人收藏分开管理。它在本地完成选包、搜索、原图校验、预览和收藏整理，不要求微信账号、MCP 服务或常驻网络连接；任何能运行 CLI 的 Agent 都可以通过稳定的 JSON 合同使用它。
+
+默认策略是安装 CLI 时不下载原图；首次执行 `sticker setup` 会安装 `curated` 精选表情包。只有显式传入 `--pack all` 才下载全量素材。
 
 ## 你可以用它做什么
 
-- 按需安装精选包或全量包，默认只安装精选包，避免一次下载完整素材集。
+- 按需安装精选表情包或全量表情包；`setup` 默认精选，避免一次下载完整素材集。
 - 用宽泛的场景词搜索，返回多个候选；描述用于帮助选择，不把一个词绑定到唯一情绪。
 - 返回经过 MD5/SHA-256 校验的本地原图路径。静态 WebP 可以按需生成 PNG 预览，动图仍保留原图。
-- 从本地原图或标准 v1 素材目录添加、导入、导出个人收藏，公共包更新不会覆盖收藏原图。
+- 从本地原图或标准 v1 表情包目录添加、导入、导出个人收藏，公共包更新不会覆盖收藏原图。
 - 像整理收藏夹一样创建分组、筛选四种排序方式，并原子地批量移动、重排或移出条目。
 
-CLI 与公共素材仓库是两个独立项目：
+CLI 与表情包素材仓库是两个独立项目：
 
 - 程序：[sticker-cli](https://github.com/9Ashwin/sticker-cli)
 - 素材：[sticker-ext](https://github.com/9Ashwin/sticker-ext)
@@ -52,7 +54,7 @@ curl --proto '=https' --tlsv1.2 -fsSL \
 
 #### Agent 快速开始
 
-安装完成后，Agent 只需要初始化一个素材包即可开始工作：
+安装完成后，Agent 首次使用时初始化精选表情包即可开始工作：
 
 ```bash
 sticker setup --pack curated
@@ -60,7 +62,7 @@ sticker search "回应" --limit 8
 ```
 
 之后可以直接说“发个表情包给我”或“找个调皮的表情”，Skill 会把请求路由到
-`search → get → 展示`；全量素材仍需显式执行 `sticker setup --pack all`。
+`search → get → 展示`；全量表情包仍需显式执行 `sticker setup --pack all`。
 
 #### 从源码安装
 
@@ -105,7 +107,7 @@ npx --yes skills add https://github.com/9Ashwin/sticker-cli/tree/main \
 
 版本 tag 触发发布工作流后，会为 Linux amd64/arm64、macOS amd64/arm64 和 Windows amd64 生成带 SHA-256 校验的归档；归档只含程序、版本/校验文件和许可证，不包含原图。
 
-### 2. 选择素材包
+### 2. 选择表情包素材
 
 可以使用官方 HTTPS 源，也可以显式指定本地素材仓库。指定本地源便于离线使用和导入你刚整理的素材描述：
 
@@ -131,7 +133,7 @@ sticker packs remove curated --dry-run
 
 只想查看将要发生的变化时，加上 `--dry-run`；它不会写入本地素材库。
 
-### 3. 搜索并取得图片
+### 3. 搜索并取得表情包
 
 默认输出 JSON，Agent 应从返回结果读取 ID 和绝对路径，不要自行拼接文件名：
 
@@ -147,9 +149,9 @@ sticker get <id>
 sticker get <id> --preview
 ```
 
-这会在本地生成或复用 `data.item.preview_path`（PNG），不会改变 WebP 原图、MD5 或 SHA-256。GIF 和动画图片应使用原图路径交给支持动图的客户端渲染。CLI 只返回本地路径，不代表已经把图片发送到外部聊天。
+这会在本地生成或复用 `data.item.preview_path`（PNG），不会改变 WebP 原图、MD5 或 SHA-256。GIF 和动画表情包应使用原图路径交给支持动图的客户端渲染。CLI 只返回本地路径，不代表已经把表情包发送到外部聊天。
 
-### 4. 添加和导入收藏
+### 4. 添加和导入表情包收藏
 
 从本地原图添加，或复制一个已经安装的条目：
 
@@ -258,7 +260,7 @@ sticker --help
 - 收藏分组的创建、重命名、删除、筛选、手动/时间/描述/MD5 排序和批量整理。
 - Agent Skill 与 Linux/macOS 离线端到端验收。
 
-项目仍把“在外部聊天中发送图片”交给调用方的客户端；CLI 的职责是返回可验证的本地路径。后续版本会按实际使用需求继续完善素材目录和发布归档。
+项目仍把“在外部聊天中发送表情包”交给调用方的客户端；CLI 的职责是返回可验证的本地路径。后续版本会按实际使用需求继续完善素材目录和发布归档。
 
 ## 源码开发
 
