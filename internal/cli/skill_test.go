@@ -22,6 +22,8 @@ func TestAgentSkillDocumentsDiscoverableCommands(t *testing.T) {
 	}
 	text := string(skill)
 	for _, example := range []string{
+		"发个表情包",
+		"意图路由",
 		"sticker setup --pack curated",
 		"sticker setup --pack all",
 		"sticker packs install curated",
@@ -39,6 +41,9 @@ func TestAgentSkillDocumentsDiscoverableCommands(t *testing.T) {
 	}
 	if !strings.Contains(text, "does not send an image to an external chat") {
 		t.Error("skill must describe the local display boundary")
+	}
+	if !strings.Contains(text, "data.item.path") {
+		t.Error("skill must instruct agents to render the verified local path")
 	}
 
 	for _, command := range []string{
